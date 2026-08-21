@@ -26,7 +26,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
        user = User.objects.create_user(**validated_data)
        token = generate_email_verification_token(user)
        verification_url = (
-            f"http://192.168.100.7:8000/api/users/"
+            f"http://api.aksyon.online/api/users/"
             f"verify-email/{user.id}/{token}/"
         )
        send_mail(
