@@ -3,44 +3,54 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 from django.contrib.auth.password_validation import validate_password
 from .utils import generate_email_verification_token
-from django.core.mail import send_mail
+import resend
 from django.conf import settings
+from django.db import transaction
 class RegisterUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
         fields = (
-            'username',
-            'email',
-            'first_name',
-            'last_name',
-            'password',
-            'contact_number',
-            'residential_barangay')
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "password",
+            "contact_number",
+            "residential_barangay",
+        )
 
     def validate_password(self, value):
         validate_password(value)
         return value
+
     def create(self, validated_data):
-       user = User.objects.create_user(**validated_data)
-       token = generate_email_verification_token(user)
-       verification_url = (
-            f"http://api.aksyon.online/api/users/"
-            f"verify-email/{user.id}/{token}/"
-        )
-       send_mail(
-           subject="Verify your email",
-           message=(
-                "Welcome!\n\n"
-                "Please verify your email by opening the link below:\n\n"
-                f"{verification_url}\n\n"
-                "You must verify your email before you can log in."),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-       return user
+        with transaction.atomic():
+            user = User.objects.create_user(**validated_data)
+
+            token = generate_email_verification_token(user)
+
+            verification_url = (
+                f"{settings.BACKEND_URL}/api/users/"
+                f"verify-email/{user.id}/{token}/"
+            )
+
+            resend.api_key = settings.RESEND_API_KEY
+
+            resend.Emails.send({
+                "from": settings.DEFAULT_FROM_EMAIL,
+                "to": [user.email],
+                "subject": "Verify your email",
+                "text": (
+                    "Welcome!\n\n"
+                    "Please verify your email by opening the link below:\n\n"
+                    f"{verification_url}\n\n"
+                    "You must verify your email before you can log in."
+                ),
+            })
+
+            return user
 
 
 class AdminRegisterSerializer(serializers.ModelSerializer):
