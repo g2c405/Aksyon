@@ -51,12 +51,10 @@ class ReportViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         report = serializer.save(user=self.request.user)
-        serializer.save(user=self.request.user)
         template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
 
         Notification.objects.create(
         user=report.user,
-        notification_type=Notification.NotificationType.REPORT_UPDATE,
         report=report,
         **template
     )
