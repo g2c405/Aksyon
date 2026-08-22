@@ -11,7 +11,7 @@ from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth.tokens import default_token_generator
-
+from django import render
 # Create your views here.
 
 class VerifyEmailView(APIView):
@@ -20,32 +20,51 @@ class VerifyEmailView(APIView):
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return Response(
-                {"detail": "Invalid verification link."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": "This verification link is invalid.",
+                },
+                status=400,
             )
 
         if user.email_verified:
-            return Response(
-                {"detail": "Email is already verified."},
-                status=status.HTTP_200_OK,
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success" : False,
+                    "message" : "This email is already verified."
+                },
+                status=400,
             )
 
         if not default_token_generator.check_token(
             user,
             token,
         ):
-            return Response(
-                {"detail": "Invalid or expired verification link."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success" : False,
+                    "message" : "This verification link is invalid or has expired."
+                },
+                status=400,
             )
 
         user.email_verified = True
         user.save(update_fields=["email_verified"])
 
-        return Response(
-            {"detail": "Email successfully verified."},
-            status=status.HTTP_200_OK,
+        return render(
+            request,
+            "users/email_verification.html",
+            {
+                "success" : True
+            },
+            status=200,
         )
 
 
