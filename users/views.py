@@ -11,7 +11,7 @@ from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth.tokens import default_token_generator
-from django import render
+from django.shortcuts import render
 # Create your views here.
 
 class VerifyEmailView(APIView):
