@@ -31,8 +31,12 @@ class ReportViewSet(ModelViewSet):
     def get_queryset(self):
         now = timezone.now()
         cutoff = now - timedelta(hours=24)
+
         return (
             Report.objects
+            .filter(
+                user=self.request.user,
+            )
             .filter(
                 ~Q(status=Status.RESOLVED) |
                 Q(
