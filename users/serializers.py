@@ -6,6 +6,8 @@ from .utils import generate_email_verification_token
 import resend
 from django.conf import settings
 from django.db import transaction
+from django.core.exceptions import ValidationError
+
 class RegisterUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
@@ -51,6 +53,55 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             })
 
             return user
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True,
+        required=True,
+    )
+
+    new_password = serializers.CharField(
+        write_only=True,
+        required=True,
+    )
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+
+        current_password = attrs["current_password"]
+        new_password = attrs["new_password"]
+
+        if not user.check_password(current_password):
+            raise serializers.ValidationError(
+                {
+                    "current_password": (
+                        "Current password is incorrect."
+                    )
+                }
+            )
+        if current_password == new_password:
+            raise serializers.ValidationError(
+                {
+                    "new_password": (
+                        "New password must be different "
+                        "from your current password."
+                    )
+                }
+            )
+
+        try:
+            validate_password(
+                new_password,
+                user=user,
+            )
+        except ValidationError as error:
+            raise serializers.ValidationError(
+                {
+                    "new_password": error.messages
+                }
+            )
+
+        return attrs
 
 
 class AdminRegisterSerializer(serializers.ModelSerializer):
