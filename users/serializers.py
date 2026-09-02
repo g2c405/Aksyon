@@ -7,6 +7,7 @@ import resend
 from django.conf import settings
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from core.choices import Role
 
 class RegisterUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
@@ -53,7 +54,6 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             })
 
             return user
-
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(
         write_only=True,
@@ -106,21 +106,22 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class AdminRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+
     class Meta:
         model = User
         fields = (
             "username",
             "email",
-            'first_name',
-            'last_name',
+            "first_name",
+            "last_name",
             "password",
-            'contact_number',
+            "contact_number",
             "assigned_barangay",
         )
 
     def validate_password(self, value):
-            validate_password(value)
-            return value
+        validate_password(value)
+        return value
 
     def validate(self, attrs):
         if not attrs.get("assigned_barangay"):
@@ -134,7 +135,8 @@ class AdminRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return User.objects.create_user(
             **validated_data,
-            role=User.Role.ADMIN,
+            role=Role.ADMIN,
+            email_verified=True,
         )
 
 class UserSerializer(serializers.ModelSerializer):

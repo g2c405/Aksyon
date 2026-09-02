@@ -47,3 +47,8 @@ class Status(models.TextChoices):
     PENDING = "pending", "Pending"
     ONGOING = "ongoing", "Ongoing"
     RESOLVED = "resolved", "Resolved"
+
+class DuplicateStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    CONFIRMED = "confirmed", "Confirmed"
+    DISMISSED = "dismissed", "Dismissed"

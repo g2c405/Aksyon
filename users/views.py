@@ -18,6 +18,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 from .serializers import ChangePasswordSerializer
+from .serializers import AdminRegisterSerializer
 # Create your views here.
 
 class VerifyEmailView(APIView):
@@ -285,3 +286,27 @@ class AdminUserView(RetrieveUpdateAPIView):
         if self.request.method in ["PUT", "PATCH"]:
             return AdminUserUpdateSerializer
         return AdminUserSerializer
+
+class AdminRegisterView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AdminRegisterSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response(
+            {
+                "detail": "Admin account created successfully.",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "assigned_barangay": user.assigned_barangay,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )

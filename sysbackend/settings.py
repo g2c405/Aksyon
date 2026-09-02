@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'users',
     'reports',
     'notifications',
+    'analytics',
     'rest_framework.authtoken',
 ]
 
@@ -63,6 +64,15 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
     ),
+     "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "60/minute",
+    },
 }
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -113,6 +123,12 @@ DATABASES = {
     )
 }
 
+#DATABASES = {
+ #   'default': {
+  #      'ENGINE': 'django.db.backends.sqlite3',
+   #     'NAME': BASE_DIR / 'db.sqlite3',
+    #}
+#}
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

@@ -1,5 +1,5 @@
-from .models import Report
-from .serializers import ReportSerializer, AdminRetrieveReportSerializer, ReportListSerializer, AdminUpdateReportSerializer
+from .models import Report, PotentialDuplicate
+from .serializers import ReportSerializer, AdminReportListSerializer, AdminReportDetailSerializer, ReportListSerializer, AdminReportUpdateSerializer, AdminPotentialDuplicateDetailSerializer, AdminPotentialDuplicateListSerializer, AdminPotentialDuplicateUpdateSerializer
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.views import APIView
@@ -25,6 +25,8 @@ from notifications.models import Notification
 from users.permissions import IsUser, IsAdmin
 from notifications.templates import STATUS_NOTIFICATION_TEMPLATES
 from core.choices import Status
+from .duplicate_detection import save_potential_duplicates
+
 class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
 
@@ -55,13 +57,13 @@ class ReportViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         report = serializer.save(user=self.request.user)
+        save_potential_duplicates(report)
         template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
-
         Notification.objects.create(
-        user=report.user,
-        report=report,
-        **template
-    )
+            user=report.user,
+            report=report,
+            **template
+        )
 
     @action(
         detail=True,
@@ -70,8 +72,13 @@ class ReportViewSet(ModelViewSet):
     )
     def video_url(self, request, pk=None):
         report = self.get_object()
+
         if not report.media:
-            return Response({"video_url": None}, status=status.HTTP_200_OK)
+            return Response(
+                {"video_url": None},
+                status=status.HTTP_200_OK
+            )
+
         media_type = get_media_type(report.media)
 
         if media_type != "video":
@@ -79,19 +86,47 @@ class ReportViewSet(ModelViewSet):
                 {"video_url": None},
                 status=status.HTTP_200_OK,
             )
+
         video_url = create_signed_read_url(report.media)
+
         return Response(
             {"video_url": video_url},
             status=status.HTTP_200_OK,
         )
 
+
 class AdminListReportView(ListAPIView):
     permission_classes = [IsAdmin]
-    serializer_class = AdminRetrieveReportSerializer
+    serializer_class = AdminReportListSerializer
+
     def get_queryset(self):
         return Report.objects.filter(
             barangay=self.request.user.assigned_barangay
         ).order_by("-created_at")
+
+
+class AdminPotentialDuplicateListView(ListAPIView):
+    permission_classes = [IsAdmin]
+    serializer_class = AdminPotentialDuplicateListSerializer
+
+    def get_queryset(self):
+        return PotentialDuplicate.objects.filter(
+            report__barangay=self.request.user.assigned_barangay,
+        ).order_by("-created_at")
+
+class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        return PotentialDuplicate.objects.filter(
+            report__barangay=self.request.user.assigned_barangay,
+        )
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return AdminPotentialDuplicateUpdateSerializer
+
+        return AdminPotentialDuplicateDetailSerializer
 
 class AdminReportView(RetrieveUpdateAPIView):
     permission_classes = [IsAdmin]
@@ -103,9 +138,9 @@ class AdminReportView(RetrieveUpdateAPIView):
 
     def get_serializer_class(self):
         if self.request.method in ["PUT", "PATCH"]:
-            return AdminUpdateReportSerializer
+            return AdminReportUpdateSerializer
 
-        return AdminRetrieveReportSerializer
+        return AdminReportDetailSerializer
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
@@ -133,6 +168,39 @@ class AdminReportView(RetrieveUpdateAPIView):
             **template,
         )
 
+
+class AdminReportVideoURLView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        report = get_object_or_404(
+            Report,
+            id=pk,
+            barangay=request.user.assigned_barangay,
+        )
+
+        if not report.media:
+            return Response(
+                {"video_url": None},
+                status=status.HTTP_200_OK,
+            )
+
+        media_type = get_media_type(report.media)
+
+        if media_type != "video":
+            return Response(
+                {"video_url": None},
+                status=status.HTTP_200_OK,
+            )
+
+        video_url = create_signed_read_url(report.media)
+
+        return Response(
+            {"video_url": video_url},
+            status=status.HTTP_200_OK,
+        )
+
+
 class MediaUploadURLView(APIView):
     permission_classes = [IsUser]
 
@@ -143,6 +211,7 @@ class MediaUploadURLView(APIView):
         print("USER ID:", request.user.id)
         report_id = request.data.get("report_id")
         print("REPORT ID:", report_id)
+
         if not report_id:
             return Response(
                 {"error": "report_id is required"},
@@ -150,18 +219,20 @@ class MediaUploadURLView(APIView):
             )
 
         report = get_object_or_404(
-                    Report,
-                    id=report_id,
-                    user=request.user,
-                )
-        
+            Report,
+            id=report_id,
+            user=request.user,
+        )
+
         content_type = request.data.get("content_type")
         print("CONTENT TYPE:", content_type)
+
         if not content_type:
             return Response(
                 {"error": "content_type is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
         allowed_types = {
             "image/jpeg": "jpg",
             "image/png": "png",
@@ -169,22 +240,32 @@ class MediaUploadURLView(APIView):
             "video/mp4": "mp4",
             "video/quicktime": "mov",
         }
+
         if content_type not in allowed_types:
             return Response(
                 {"detail": "Unsupported media type."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
         extension = allowed_types[content_type]
+
         print("REPORT VERIFIED:", report.id)
         print("REPORT OWNER:", report.user.id)
         print("ALLOWED EXTENSION:", extension)
+
         result = create_upload_url(
             report_id=report.id,
             content_type=content_type,
             extension=extension,
         )
+
         print("SIGNED URL RESULT:", result)
-        return Response(result, status=status.HTTP_200_OK)
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK
+        )
+
 
 class NearbyReportView(APIView):
     permission_classes = [IsUser]
@@ -237,6 +318,8 @@ class NearbyReportView(APIView):
             data.append(serialized)
 
         return Response(data)
+
+
 class NearestBarangayView(APIView):
     permission_classes = [IsUser]
 

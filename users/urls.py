@@ -9,7 +9,8 @@ from .views import (
     VerifyEmailView, 
     ForgotPasswordView, 
     ResetPasswordView,
-    ChangePasswordView
+    ChangePasswordView,
+    AdminRegisterView
 )
 from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [
@@ -22,5 +23,10 @@ urlpatterns = [
     path("reset-password/", ResetPasswordView.as_view(), name="reset-password"),
     path('me/', MeView.as_view(), name="me"),
     path('admin/', AdminUserListView.as_view(), name="admin-user-list"),
-    path('admin/<int:pk>/', AdminUserView.as_view(), name="admin-user-detail")
+    path('admin/<int:pk>/', AdminUserView.as_view(), name="admin-user-detail"),
+    path(
+    "admin/register/",
+    AdminRegisterView.as_view(),
+    name="admin-register",
+    ),
 ]
