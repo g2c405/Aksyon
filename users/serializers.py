@@ -104,7 +104,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
-class AdminRegisterSerializer(serializers.ModelSerializer):
+class AdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
@@ -166,3 +166,14 @@ class AdminMeSerializer(serializers.ModelSerializer):
             'contact_number',
             'assigned_barangay',
         )
+
+class AdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'first_name', 'last_name', 'username', 'email', 'contact_number', 'assigned_barangay', 'role', 'is_active', 'date_joined')
+
+
+class AdminUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('email', 'is_active', 'contact_number', 'assigned_barangay',)  # keep it limited

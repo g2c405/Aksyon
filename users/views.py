@@ -1,6 +1,6 @@
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateAPIView, RetrieveAPIView
 from rest_framework.views import APIView
-from .serializers import RegisterUserSerializer, UserSerializer, AdminUserSerializer, AdminUserUpdateSerializer, AdminMeSerializer
+from .serializers import RegisterUserSerializer, UserSerializer, AdminSerializer, AdminUserSerializer, AdminUserUpdateSerializer, AdminMeSerializer, AdminCreateSerializer, AdminUpdateSerializer
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,7 +18,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 from .serializers import ChangePasswordSerializer
-from .serializers import AdminRegisterSerializer
+from .serializers import AdminCreateSerializer
+from core.choices import Role
 # Create your views here.
 
 class VerifyEmailView(APIView):
@@ -287,26 +288,28 @@ class AdminUserView(RetrieveUpdateAPIView):
             return AdminUserUpdateSerializer
         return AdminUserSerializer
 
-class AdminRegisterView(APIView):
-    permission_classes = [permissions.AllowAny]
+class AdminCreateView(CreateAPIView):
+    permission_classes = [IsPrivilegedAdmin]
+    serializer_class = AdminCreateSerializer
 
-    def post(self, request):
-        serializer = AdminRegisterSerializer(
-            data=request.data
-        )
+class AdminListView(ListAPIView):
+    queryset = User.objects.filter(
+        role=Role.ADMIN
+    ).order_by("-date_joined")
 
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+    permission_classes = [IsPrivilegedAdmin]
+    serializer_class = AdminSerializer
 
-        return Response(
-            {
-                "detail": "Admin account created successfully.",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "assigned_barangay": user.assigned_barangay,
-                },
-            },
-            status=status.HTTP_201_CREATED,
-        )
+
+class AdminRetrieveUpdateView(RetrieveUpdateAPIView):
+    queryset = User.objects.filter(
+        role=Role.ADMIN
+    )
+
+    permission_classes = [IsPrivilegedAdmin]
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return AdminUpdateSerializer
+
+        return AdminSerializer
