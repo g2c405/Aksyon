@@ -1,6 +1,6 @@
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateAPIView, RetrieveAPIView
 from rest_framework.views import APIView
-from .serializers import RegisterUserSerializer, UserSerializer, AdminSerializer, AdminUserSerializer, AdminUserUpdateSerializer, AdminMeSerializer, AdminCreateSerializer, AdminUpdateSerializer
+from .serializers import RegisterUserSerializer, UserSerializer, PrivilegedAdminMeSerializer, AdminSerializer, AdminUserSerializer, AdminUserUpdateSerializer, AdminMeSerializer, AdminCreateSerializer, AdminUpdateSerializer
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework import status
@@ -263,14 +263,16 @@ class ResetPasswordView(APIView):
         )
 
 class MeView(RetrieveAPIView):
-    permission_classes = [IsUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
 
     def get_serializer_class(self):
-        if self.request.user.is_staff:
+        if self.request.user.role == Role.ADMIN:
             return AdminMeSerializer
+        elif self.request.user.role == Role.PRIVILEGED_ADMIN:
+            return PrivilegedAdminMeSerializer
         return UserSerializer
 
 

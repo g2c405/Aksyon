@@ -12,7 +12,7 @@ from .views import (
     ChangePasswordView,
     AdminCreateView,
     AdminListView,
-    AdminRetrieveUpdateView
+    AdminRetrieveUpdateView,
 )
 from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [

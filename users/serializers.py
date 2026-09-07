@@ -177,3 +177,16 @@ class AdminUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('email', 'is_active', 'contact_number', 'assigned_barangay',)  # keep it limited
+
+class PrivilegedAdminMeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'contact_number',
+            'role',
+        )
