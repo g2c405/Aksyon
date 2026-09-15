@@ -52,3 +52,4 @@ class DuplicateStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     CONFIRMED = "confirmed", "Confirmed"
     DISMISSED = "dismissed", "Dismissed"
+

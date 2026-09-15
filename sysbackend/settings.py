@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'reports',
     'notifications',
     'analytics',
+    'announcements',
     'rest_framework.authtoken',
 ]
 

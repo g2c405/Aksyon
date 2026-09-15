@@ -277,10 +277,12 @@ class MeView(RetrieveAPIView):
 
 
 class AdminUserListView(ListAPIView):
-    queryset = User.objects.all().order_by('-date_joined')
     permission_classes = [IsAdmin]
     serializer_class = AdminUserSerializer
-
+    def get_queryset(self):
+            return User.objects.filter(
+                residential_barangay=self.request.user.assigned_barangay
+            ).order_by("-date_joined")
 class AdminUserView(RetrieveUpdateAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAdmin]

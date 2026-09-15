@@ -24,3 +24,11 @@ STATUS_NOTIFICATION_TEMPLATES = {
         ),
     },
 }
+
+ANNOUNCEMENT_NOTIFICATION_TEMPLATE = {
+    "notification_type": "admin_announcement",
+    "title": "New barangay announcement",
+    "message": (
+        "Your barangay has posted a new announcement."
+    ),
+}
