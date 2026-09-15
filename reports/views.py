@@ -26,6 +26,7 @@ from users.permissions import IsUser, IsAdmin
 from notifications.templates import STATUS_NOTIFICATION_TEMPLATES
 from core.choices import Status
 from .duplicate_detection import save_potential_duplicates
+from core.choices import Status, DuplicateStatus
 
 class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
@@ -127,6 +128,27 @@ class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
             return AdminPotentialDuplicateUpdateSerializer
 
         return AdminPotentialDuplicateDetailSerializer
+
+    def perform_update(self, serializer):
+        old_status = serializer.instance.status
+
+        duplicate = serializer.save()
+
+        if old_status == duplicate.status:
+            return
+
+        if duplicate.status == DuplicateStatus.CONFIRMED:
+            report = duplicate.report
+
+            report.status = Status.RESOLVED
+            report.resolved_at = timezone.now()
+
+            report.save(
+                update_fields=[
+                    "status",
+                    "resolved_at",
+                ]
+            )
 
 class AdminReportView(RetrieveUpdateAPIView):
     permission_classes = [IsAdmin]

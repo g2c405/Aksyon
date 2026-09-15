@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'analytics',
     'announcements',
     'rest_framework.authtoken',
+    'corsheaders'
 ]
 
 AUTH_USER_MODEL = "users.User"
@@ -84,8 +85,12 @@ BACKEND_URL = os.getenv(
     "http://192.168.100.7:8000"
 )
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
