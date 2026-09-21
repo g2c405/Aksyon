@@ -41,3 +41,46 @@ class Command(BaseCommand):
                     "Privileged admin account already exists. Skipping creation."
                 )
             )
+
+        # ============================================================
+        # DEV TESTING ADMIN
+        # Delete this entire section when no longer needed.
+        # ============================================================
+
+        dev_username = "devadmin"
+        dev_password = "DevAdmin123!"
+        dev_email = "devadmin@example.com"
+
+        dev_user, dev_created = User.objects.get_or_create(
+            username=dev_username,
+            defaults={
+                "first_name": "Dev",
+                "last_name": "Admin",
+                "email": dev_email,
+                "contact_number": None,
+                "role": "admin",
+                "assigned_barangay": "Santa Trinidad",
+                "email_verified": True,
+                "is_active": True,
+            },
+        )
+
+        if dev_created:
+            dev_user.set_password(dev_password)
+            dev_user.save(update_fields=["password"])
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Dev admin account created successfully."
+                )
+            )
+        else:
+            self.stdout.write(
+                self.style.WARNING(
+                    "Dev admin account already exists. Skipping creation."
+                )
+            )
+
+        # ============================================================
+        # END DEV TESTING ADMIN
+        # ============================================================
