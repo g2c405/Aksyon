@@ -12,12 +12,16 @@ from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import render
-from .utils import generate_password_reset_token
+from .utils import (
+    generate_password_reset_token,
+    generate_email_change_token,
+)
+from django.core import signing
 import resend
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
-from .serializers import ChangePasswordSerializer
+from .serializers import ChangePasswordSerializer, ChangeEmailSerializer, ChangeContactNumberSerializer
 from .serializers import AdminCreateSerializer
 from core.choices import Role
 # Create your views here.
@@ -203,6 +207,160 @@ class ChangePasswordView(APIView):
         return Response(
             {
                 "detail": "Password changed successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class ChangeEmailView(APIView):
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        serializer = ChangeEmailSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        new_email = serializer.validated_data["new_email"]
+
+        token = generate_email_change_token(
+            request.user,
+            new_email,
+        )
+
+        verification_url = (
+            f"{settings.BACKEND_URL}/api/users/"
+            f"verify-email-change/{token}/"
+        )
+
+        resend.api_key = settings.RESEND_API_KEY
+
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [new_email],
+            "subject": "Verify your new email address",
+            "text": (
+                "You requested to change the email address "
+                "associated with your Aksyon account.\n\n"
+                "Please verify your new email address by opening "
+                "the link below:\n\n"
+                f"{verification_url}\n\n"
+                "Your current email address will remain unchanged "
+                "until you complete this verification."
+            ),
+        })
+
+        return Response(
+            {
+                "message": (
+                    "A verification link has been sent to your "
+                    "new email address."
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class VerifyEmailChangeView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        try:
+            data = signing.loads(
+                token,
+                salt="email-change",
+                max_age=3600,
+            )
+        except signing.BadSignature:
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": (
+                        "This email change link is invalid "
+                        "or has expired."
+                    ),
+                },
+                status=400,
+            )
+
+        try:
+            user = User.objects.get(
+                pk=data["user_id"]
+            )
+        except User.DoesNotExist:
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": "This verification link is invalid.",
+                },
+                status=400,
+            )
+
+        new_email = data["new_email"]
+
+        if User.objects.filter(
+            email__iexact=new_email
+        ).exclude(
+            pk=user.pk
+        ).exists():
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": (
+                        "This email address is already associated "
+                        "with another account."
+                    ),
+                },
+                status=400,
+            )
+
+        user.email = new_email
+
+        user.save(
+            update_fields=["email"]
+        )
+
+        return render(
+            request,
+            "users/email_verification.html",
+            {
+                "success": True,
+                "message": (
+                    "Your email address has been changed successfully."
+                ),
+            },
+            status=200,
+        )
+
+class ChangeContactNumberView(APIView):
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        serializer = ChangeContactNumberSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        request.user.contact_number = (
+            serializer.validated_data["contact_number"]
+        )
+
+        request.user.save(
+            update_fields=["contact_number"]
+        )
+
+        return Response(
+            {
+                "message": (
+                    "Contact number changed successfully."
+                )
             },
             status=status.HTTP_200_OK,
         )

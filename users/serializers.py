@@ -103,6 +103,34 @@ class ChangePasswordSerializer(serializers.Serializer):
 
         return attrs
 
+class ChangeEmailSerializer(serializers.Serializer):
+    new_email = serializers.EmailField(
+        required=True,
+    )
+
+    def validate_new_email(self, value):
+        user = self.context["request"].user
+
+        if value.lower() == user.email.lower():
+            raise serializers.ValidationError(
+                "New email must be different from your current email."
+            )
+
+        if User.objects.filter(
+            email__iexact=value
+        ).exclude(
+            pk=user.pk
+        ).exists():
+            raise serializers.ValidationError(
+                "An account with this email already exists."
+            )
+
+        return value
+
+class ChangeContactNumberSerializer(serializers.Serializer):
+    contact_number = serializers.CharField(
+        required=True,
+    )
 
 class AdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)

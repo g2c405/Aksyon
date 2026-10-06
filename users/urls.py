@@ -13,6 +13,9 @@ from .views import (
     AdminCreateView,
     AdminListView,
     AdminRetrieveUpdateView,
+    ChangeEmailView,
+    VerifyEmailChangeView,
+    ChangeContactNumberView,
 )
 from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [
@@ -28,5 +31,21 @@ urlpatterns = [
     path('admin/<int:pk>/', AdminUserView.as_view(), name="admin-user-detail"),
     path("privileged-admin/register/",AdminCreateView.as_view(), name="admin-register"),
     path('privileged-admin/', AdminListView.as_view(), name='admin-list'),
-    path('privileged-admin/<int:pk>/', AdminRetrieveUpdateView.as_view(), name='privileged-admin-detail')
+    path('privileged-admin/<int:pk>/', AdminRetrieveUpdateView.as_view(), name='privileged-admin-detail'),
+    path(
+    "change-email/",
+    ChangeEmailView.as_view(),
+    name="change-email",
+    ),
+
+    path(
+        "verify-email-change/<str:token>/",
+        VerifyEmailChangeView.as_view(),
+        name="verify-email-change",
+    ),
+    path(
+        "change-contact-number/",
+        ChangeContactNumberView.as_view(),
+        name="change-contact-number",
+    ),
 ]
