@@ -6,6 +6,9 @@ from .utils import get_media_type
 from .models import Report, PotentialDuplicate
 
 class ReportSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(
+        max_length=200
+    )
     class Meta:
         model = Report
         fields = (
