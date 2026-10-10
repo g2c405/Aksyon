@@ -156,8 +156,8 @@ class ForgotPasswordView(APIView):
         token = generate_password_reset_token(user)
 
         reset_url = (
-            f"aksyon://reset-password/"
-            f"{user.id}/{token}"
+            f"{settings.BACKEND_URL}/api/users/"
+            f"reset-password-page/{user.id}/{token}/"
         )
 
         resend.api_key = settings.RESEND_API_KEY
@@ -418,6 +418,111 @@ class ResetPasswordView(APIView):
                 "message": "Password has been reset successfully."
             },
             status=status.HTTP_200_OK,
+        )
+
+class PasswordResetPageView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, user_id, token):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return render(
+                request,
+                "users/password_reset.html",
+                {
+                    "success": False,
+                    "invalid_link": True,
+                    "message": "This password reset link is invalid.",
+                },
+                status=400,
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return render(
+                request,
+                "users/password_reset.html",
+                {
+                    "success": False,
+                    "invalid_link": True,
+                    "message": (
+                        "This password reset link is invalid "
+                        "or has expired. Please request a new one."
+                    ),
+                },
+                status=400,
+            )
+
+        return render(
+            request,
+            "users/password_reset.html",
+            {
+                "success": False,
+                "invalid_link": False,
+            },
+        )
+
+    def post(self, request, user_id, token):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return render(
+                request,
+                "users/password_reset.html",
+                {
+                    "success": False,
+                    "invalid_link": True,
+                    "message": "This password reset link is invalid.",
+                },
+                status=400,
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return render(
+                request,
+                "users/password_reset.html",
+                {
+                    "success": False,
+                    "invalid_link": True,
+                    "message": (
+                        "This password reset link is invalid "
+                        "or has expired. Please request a new one."
+                    ),
+                },
+                status=400,
+            )
+
+        new_password = request.POST.get("new_password", "")
+        confirm_password = request.POST.get("confirm_password", "")
+
+        if not new_password or not confirm_password:
+            message = "Please fill in both password fields."
+        elif new_password != confirm_password:
+            message = "The passwords do not match."
+        else:
+            try:
+                validate_password(new_password, user)
+            except ValidationError as error:
+                message = " ".join(error.messages)
+            else:
+                user.set_password(new_password)
+                user.save(update_fields=["password"])
+
+                return render(
+                    request,
+                    "users/password_reset.html",
+                    {"success": True},
+                )
+
+        return render(
+            request,
+            "users/password_reset.html",
+            {
+                "success": False,
+                "invalid_link": False,
+                "message": message,
+            },
+            status=400,
         )
 
 class MeView(RetrieveAPIView):
