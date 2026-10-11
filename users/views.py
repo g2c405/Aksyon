@@ -24,10 +24,63 @@ from django.contrib.auth.password_validation import validate_password
 from .serializers import ChangePasswordSerializer, ChangeEmailSerializer, ChangeContactNumberSerializer
 from .serializers import AdminCreateSerializer
 from core.choices import Role
+
+# Added for account-change notifications
+from django.db import transaction
+from notifications.models import Notification
+
+
+def create_account_change_notification(user, event):
+    notification_content = {
+        "email_changed": {
+            "title": "Email Address Changed",
+            "message": (
+                "Your account email address was successfully changed. "
+                "If you didn't make this change, please secure "
+                "your account immediately."
+            ),
+        },
+        "contact_changed": {
+            "title": "Contact Number Changed",
+            "message": (
+                "Your account contact number was successfully changed. "
+                "If you didn't make this change, please secure "
+                "your account immediately."
+            ),
+        },
+        "password_changed": {
+            "title": "Password Changed",
+            "message": (
+                "Your account password was successfully changed. "
+                "If you didn't make this change, please secure "
+                "your account immediately."
+            ),
+        },
+        "password_reset": {
+            "title": "Password Reset Successful",
+            "message": (
+                "Your password was successfully reset. "
+                "If you didn't make this change, please secure "
+                "your account immediately."
+            ),
+        },
+    }
+
+    content = notification_content[event]
+
+    return Notification.objects.create(
+        user=user,
+        notification_type="user_warning",
+        title=content["title"],
+        message=content["message"],
+    )
+
+
 # Create your views here.
 
 class VerifyEmailView(APIView):
     permission_classes = [permissions.AllowAny]
+
     def get(self, request, user_id, token):
         try:
             user = User.objects.get(pk=user_id)
@@ -47,8 +100,8 @@ class VerifyEmailView(APIView):
                 request,
                 "users/email_verification.html",
                 {
-                    "success" : False,
-                    "message" : "This email is already verified."
+                    "success": False,
+                    "message": "This email is already verified."
                 },
                 status=400,
             )
@@ -61,8 +114,8 @@ class VerifyEmailView(APIView):
                 request,
                 "users/email_verification.html",
                 {
-                    "success" : False,
-                    "message" : "This verification link is invalid or has expired."
+                    "success": False,
+                    "message": "This verification link is invalid or has expired."
                 },
                 status=400,
             )
@@ -74,7 +127,7 @@ class VerifyEmailView(APIView):
             request,
             "users/email_verification.html",
             {
-                "success" : True
+                "success": True
             },
             status=200,
         )
@@ -82,6 +135,7 @@ class VerifyEmailView(APIView):
 
 class LoginView(ObtainAuthToken):
     permission_classes = [permissions.AllowAny]
+
     def post(self, request, *args, **kwargs):
         username = request.data.get("username")
         password = request.data.get("password")
@@ -118,6 +172,7 @@ class RegisterView(CreateAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterUserSerializer
 
+
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -127,6 +182,7 @@ class LogoutView(APIView):
             {"message": "Logout successful."},
             status=status.HTTP_200_OK
         )
+
 
 class ForgotPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -185,6 +241,7 @@ class ForgotPasswordView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
 class ChangePasswordView(APIView):
     permission_classes = [IsUser]
 
@@ -196,13 +253,19 @@ class ChangePasswordView(APIView):
 
         serializer.is_valid(raise_exception=True)
 
-        request.user.set_password(
-            serializer.validated_data["new_password"]
-        )
+        with transaction.atomic():
+            request.user.set_password(
+                serializer.validated_data["new_password"]
+            )
 
-        request.user.save(
-            update_fields=["password"]
-        )
+            request.user.save(
+                update_fields=["password"]
+            )
+
+            create_account_change_notification(
+                request.user,
+                "password_changed",
+            )
 
         return Response(
             {
@@ -210,6 +273,7 @@ class ChangePasswordView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 class ChangeEmailView(APIView):
     permission_classes = [IsUser]
@@ -260,6 +324,7 @@ class ChangeEmailView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 class VerifyEmailChangeView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -320,11 +385,17 @@ class VerifyEmailChangeView(APIView):
                 status=400,
             )
 
-        user.email = new_email
+        with transaction.atomic():
+            user.email = new_email
 
-        user.save(
-            update_fields=["email"]
-        )
+            user.save(
+                update_fields=["email"]
+            )
+
+            create_account_change_notification(
+                user,
+                "email_changed",
+            )
 
         return render(
             request,
@@ -338,6 +409,7 @@ class VerifyEmailChangeView(APIView):
             status=200,
         )
 
+
 class ChangeContactNumberView(APIView):
     permission_classes = [IsUser]
 
@@ -348,13 +420,19 @@ class ChangeContactNumberView(APIView):
 
         serializer.is_valid(raise_exception=True)
 
-        request.user.contact_number = (
-            serializer.validated_data["contact_number"]
-        )
+        with transaction.atomic():
+            request.user.contact_number = (
+                serializer.validated_data["contact_number"]
+            )
 
-        request.user.save(
-            update_fields=["contact_number"]
-        )
+            request.user.save(
+                update_fields=["contact_number"]
+            )
+
+            create_account_change_notification(
+                request.user,
+                "contact_changed",
+            )
 
         return Response(
             {
@@ -410,8 +488,17 @@ class ResetPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.set_password(new_password)
-        user.save(update_fields=["password"])
+        with transaction.atomic():
+            user.set_password(new_password)
+
+            user.save(
+                update_fields=["password"]
+            )
+
+            create_account_change_notification(
+                user,
+                "password_reset",
+            )
 
         return Response(
             {
@@ -419,6 +506,7 @@ class ResetPasswordView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 class PasswordResetPageView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -505,8 +593,17 @@ class PasswordResetPageView(APIView):
             except ValidationError as error:
                 message = " ".join(error.messages)
             else:
-                user.set_password(new_password)
-                user.save(update_fields=["password"])
+                with transaction.atomic():
+                    user.set_password(new_password)
+
+                    user.save(
+                        update_fields=["password"]
+                    )
+
+                    create_account_change_notification(
+                        user,
+                        "password_reset",
+                    )
 
                 return render(
                     request,
@@ -525,6 +622,7 @@ class PasswordResetPageView(APIView):
             status=400,
         )
 
+
 class MeView(RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -542,10 +640,13 @@ class MeView(RetrieveAPIView):
 class AdminUserListView(ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = AdminUserSerializer
+
     def get_queryset(self):
-            return User.objects.filter(
-                residential_barangay=self.request.user.assigned_barangay
-            ).order_by("-date_joined")
+        return User.objects.filter(
+            residential_barangay=self.request.user.assigned_barangay
+        ).order_by("-date_joined")
+
+
 class AdminUserView(RetrieveUpdateAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAdmin]
@@ -555,9 +656,11 @@ class AdminUserView(RetrieveUpdateAPIView):
             return AdminUserUpdateSerializer
         return AdminUserSerializer
 
+
 class AdminCreateView(CreateAPIView):
     permission_classes = [IsPrivilegedAdmin]
     serializer_class = AdminCreateSerializer
+
 
 class AdminListView(ListAPIView):
     queryset = User.objects.filter(
