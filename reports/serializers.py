@@ -33,6 +33,52 @@ class ReportSerializer(serializers.ModelSerializer):
         )
 
 
+class ReportDetailSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    video_thumbnail_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Report
+        fields = (
+            "id",
+            "user",
+            "latitude",
+            "longitude",
+            "barangay",
+            "city",
+            "description",
+            "media",
+            "media_thumbnail",
+            "image_url",
+            "video_thumbnail_url",
+            "status",
+            "created_at",
+        )
+        read_only_fields = (
+            "id",
+            "user",
+            "city",
+            "status",
+            "created_at",
+            "image_url",
+            "video_thumbnail_url",
+        )
+
+    def get_image_url(self, obj):
+        if get_media_type(obj.media) != "image":
+            return None
+
+        return create_signed_read_url(obj.media)
+
+    def get_video_thumbnail_url(self, obj):
+        if get_media_type(obj.media) != "video":
+            return None
+
+        if not obj.media_thumbnail:
+            return None
+
+        return create_signed_read_url(obj.media_thumbnail)
+
 class ReportListSerializer(serializers.ModelSerializer):
     video_thumbnail_url = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()

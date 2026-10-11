@@ -1,5 +1,5 @@
 from .models import Report, PotentialDuplicate
-from .serializers import ReportSerializer, AdminReportListSerializer, AdminReportDetailSerializer, ReportListSerializer, AdminReportUpdateSerializer, AdminPotentialDuplicateDetailSerializer, AdminPotentialDuplicateListSerializer, AdminPotentialDuplicateUpdateSerializer
+from .serializers import ReportSerializer, AdminReportListSerializer, AdminReportDetailSerializer, ReportListSerializer, AdminReportUpdateSerializer, AdminPotentialDuplicateDetailSerializer, AdminPotentialDuplicateListSerializer, AdminPotentialDuplicateUpdateSerializer, ReportDetailSerializer
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.views import APIView
@@ -54,6 +54,9 @@ class ReportViewSet(ModelViewSet):
         if self.action == "list":
             return ReportListSerializer
 
+        if self.action == "retrieve":
+            return ReportDetailSerializer
+        
         return ReportSerializer
 
     def perform_create(self, serializer):
