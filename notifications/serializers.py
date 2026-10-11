@@ -8,7 +8,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "id",
             "notification_type",
             "report",
-            "announcement"
+            "announcement",
             "title",
             "message",
             "is_read",
