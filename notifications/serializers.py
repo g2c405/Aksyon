@@ -8,6 +8,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "id",
             "notification_type",
             "report",
+            "announcement"
             "title",
             "message",
             "is_read",
@@ -16,6 +17,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "notification_type",
+            "announcement",
             "report",
             "title",
             "message",

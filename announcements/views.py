@@ -13,6 +13,7 @@ from .serializers import (
     AnnouncementSerializer,
     AnnouncementListSerializer,
     AnnouncementUpdateSerializer,
+    AnnouncementDetailSerializer,
 )
 from .services.storage import create_signed_read_url, create_upload_url
 from .utils import get_media_type
@@ -30,7 +31,7 @@ class AnnouncementListView(ListAPIView):
 
 class AnnouncementDetailView(RetrieveAPIView):
     permission_classes = [IsUser]
-    serializer_class = AnnouncementSerializer
+    serializer_class = AnnouncementDetailSerializer
 
     def get_queryset(self):
         return Announcement.objects.filter(
