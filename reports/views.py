@@ -169,29 +169,39 @@ class AdminReportView(RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
+        print("OLD STATUS:", repr(old_status))
 
         report = serializer.save()
+        print("NEW STATUS:", repr(report.status))
+        print("STATUS CHANGED:", old_status != report.status)
+        print("RESOLVED CONSTANT:", repr(Report.Status.RESOLVED))
+        print(
+            "IS RESOLVED:",
+            report.status == Report.Status.RESOLVED,
+        )
 
         if old_status == report.status:
+            print("RETURNING: status unchanged")
             return
 
-        # Set resolved_at when the report becomes resolved.
         if report.status == Report.Status.RESOLVED:
             report.resolved_at = timezone.now()
             report.save(update_fields=["resolved_at"])
+            print("RESOLVED AT SET:", report.resolved_at)
 
-        template = STATUS_NOTIFICATION_TEMPLATES.get(
-            report.status
-        )
+        template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
+        print("TEMPLATE:", repr(template))
 
         if not template:
+            print("RETURNING: no template")
             return
 
-        Notification.objects.create(
+        notification = Notification.objects.create(
             user=report.user,
             report=report,
             **template,
         )
+        print("NOTIFICATION CREATED:", notification.pk)
 
 
 class AdminReportVideoURLView(APIView):
