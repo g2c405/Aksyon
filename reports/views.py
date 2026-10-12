@@ -169,31 +169,30 @@ class AdminReportView(RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
-        print("OLD STATUS:", repr(old_status))
+        print("STEP 1: Old status:", repr(old_status))
 
         report = serializer.save()
-        print("NEW STATUS:", repr(report.status))
-        print("STATUS CHANGED:", old_status != report.status)
-        print("RESOLVED CONSTANT:", repr(Report.Status.RESOLVED))
-        print(
-            "IS RESOLVED:",
-            report.status == Report.Status.RESOLVED,
-        )
+        print("STEP 2: New status:", repr(report.status))
 
         if old_status == report.status:
-            print("RETURNING: status unchanged")
+            print("STEP 3: Status unchanged, returning")
             return
 
+        print("STEP 3: Status changed")
+
         if report.status == Report.Status.RESOLVED:
+            print("STEP 4: Entering resolved block")
+
             report.resolved_at = timezone.now()
             report.save(update_fields=["resolved_at"])
-            print("RESOLVED AT SET:", report.resolved_at)
+
+            print("STEP 5: resolved_at saved")
 
         template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
-        print("TEMPLATE:", repr(template))
+        print("STEP 6: Template:", repr(template))
 
         if not template:
-            print("RETURNING: no template")
+            print("No notification template found")
             return
 
         notification = Notification.objects.create(
@@ -201,8 +200,8 @@ class AdminReportView(RetrieveUpdateAPIView):
             report=report,
             **template,
         )
-        print("NOTIFICATION CREATED:", notification.pk)
 
+        print("STEP 7: Notification created:", notification.pk)
 
 class AdminReportVideoURLView(APIView):
     permission_classes = [IsAdmin]
