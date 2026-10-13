@@ -57,7 +57,8 @@ INSTALLED_APPS = [
     'analytics',
     'announcements',
     'rest_framework.authtoken',
-    'corsheaders'
+    'corsheaders',
+    'emergency_units',
 ]
 
 AUTH_USER_MODEL = "users.User"

@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .services.storage import create_upload_url
 from django.shortcuts import get_object_or_404
-#from emergency_units.services import get_available_responders
+from emergency_units.services import get_available_responders
 from core.geo import find_nearest
 from core.barangays import get_barangay_halls
 from datetime import timedelta
@@ -99,6 +99,7 @@ class ReportViewSet(ModelViewSet):
         )
 
 
+
 class AdminListReportView(ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = AdminReportListSerializer
@@ -107,6 +108,44 @@ class AdminListReportView(ListAPIView):
         return Report.objects.filter(
             barangay=self.request.user.assigned_barangay
         ).order_by("-created_at")
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+
+        responders = get_available_responders()
+        data = response.data
+
+        # Support both paginated and unpaginated responses.
+        reports = (
+            data["results"]
+            if isinstance(data, dict) and "results" in data
+            else data
+        )
+
+        for report in reports:
+            nearest = None
+            distance = None
+
+            if responders:
+                accident_location = (
+                    float(report["latitude"]),
+                    float(report["longitude"]),
+                )
+
+                nearest, distance = find_nearest(
+                    accident_location,
+                    responders,
+                )
+
+            report["nearest_responder"] = nearest
+            report["distance_km"] = (
+                round(distance, 4)
+                if distance is not None
+                else None
+            )
+
+        return response
+
 
 
 class AdminPotentialDuplicateListView(ListAPIView):

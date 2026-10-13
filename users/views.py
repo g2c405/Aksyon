@@ -243,7 +243,7 @@ class ForgotPasswordView(APIView):
 
 
 class ChangePasswordView(APIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUser | IsAdmin]
 
     def post(self, request):
         serializer = ChangePasswordSerializer(
@@ -276,7 +276,7 @@ class ChangePasswordView(APIView):
 
 
 class ChangeEmailView(APIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUser | IsAdmin]
 
     def post(self, request):
         serializer = ChangeEmailSerializer(
@@ -411,7 +411,7 @@ class VerifyEmailChangeView(APIView):
 
 
 class ChangeContactNumberView(APIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUser | IsAdmin]
 
     def post(self, request):
         serializer = ChangeContactNumberSerializer(
