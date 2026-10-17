@@ -1,18 +1,37 @@
+
 from datetime import timedelta
 
 import numpy as np
 from django.db.models import Count
-from django.utils.timezone import now
-from sklearn.cluster import DBSCAN
-from datetime import datetime, timedelta
-
 from django.utils.timezone import localdate, now
-from reports.models import Report
-from core.choices import Status, Barangay
+from sklearn.cluster import DBSCAN
+
+from reports.models import Report, PotentialDuplicate
+from core.choices import Status, Barangay, DuplicateStatus
+
+
+def get_analytics_reports(queryset=None):
+    """
+    Return reports eligible for analytics.
+
+    Excludes reports marked as confirmed duplicates.
+    Pending and rejected potential duplicates remain included.
+    """
+    reports = queryset if queryset is not None else Report.objects.all()
+
+    confirmed_duplicate_report_ids = (
+        PotentialDuplicate.objects.filter(
+            status=DuplicateStatus.CONFIRMED
+        ).values("report_id")
+    )
+
+    return reports.exclude(
+        id__in=confirmed_duplicate_report_ids
+    )
 
 
 def get_basic_report_stats(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     return {
         "total_reports": reports.count(),
@@ -23,7 +42,7 @@ def get_basic_report_stats(queryset=None):
 
 
 def get_top_reporters(queryset=None, limit=10):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     return list(
         reports
@@ -34,7 +53,7 @@ def get_top_reporters(queryset=None, limit=10):
 
 
 def get_reports_last_7_days(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     start_date = now() - timedelta(days=7)
 
@@ -44,7 +63,7 @@ def get_reports_last_7_days(queryset=None):
 
 
 def get_reports_by_barangay(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     data = (
         reports
@@ -60,7 +79,7 @@ def get_reports_by_barangay(queryset=None):
 
 
 def get_reports_by_barangay_with_details(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     return {
         barangay: list(
@@ -73,7 +92,7 @@ def get_reports_by_barangay_with_details(queryset=None):
 
 
 def get_reports_by_hour(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     hourly = {i: 0 for i in range(24)}
 
@@ -89,9 +108,7 @@ def get_dbscan_clusters(
     eps_km=0.5,
     min_samples=2,
 ):
-    reports = (
-        queryset if queryset is not None else Report.objects.all()
-    ).values(
+    reports = get_analytics_reports(queryset).values(
         "id",
         "latitude",
         "longitude",
@@ -134,8 +151,9 @@ def get_dbscan_clusters(
 
     return results
 
+
 def get_report_trend(queryset=None):
-    reports = queryset if queryset is not None else Report.objects.all()
+    reports = get_analytics_reports(queryset)
 
     today = localdate()
     start_date = today - timedelta(days=6)
@@ -151,7 +169,9 @@ def get_report_trend(queryset=None):
     )
 
     for report in reports:
-        date = str(report.created_at.astimezone().date())
+        date = str(
+            report.created_at.astimezone().date()
+        )
         trend[date] += 1
 
     return trend

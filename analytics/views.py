@@ -1,10 +1,11 @@
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from users.permissions import IsAdmin
-
 from reports.models import Report
+from core.choices import Barangay
 
 from .services import (
     get_basic_report_stats,
@@ -32,10 +33,7 @@ class AnalyticsDashboardView(APIView):
             "reports_by_hour": get_reports_by_hour(),
         }
 
-        return Response(
-            data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class BarangayAnalyticsDashboardView(APIView):
@@ -46,16 +44,17 @@ class BarangayAnalyticsDashboardView(APIView):
 
         if not barangay:
             return Response(
-                {
-                    "detail":
-                        "barangay query parameter is required."
-                },
+                {"detail": "barangay query parameter is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        reports = Report.objects.filter(
-            barangay=barangay
-        )
+        if barangay not in Barangay.values:
+            return Response(
+                {"detail": "Invalid barangay."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reports = Report.objects.filter(barangay=barangay)
 
         data = {
             "barangay": barangay,
@@ -73,7 +72,4 @@ class BarangayAnalyticsDashboardView(APIView):
                 get_reports_by_hour(reports),
         }
 
-        return Response(
-            data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(data, status=status.HTTP_200_OK)
