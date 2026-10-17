@@ -7,6 +7,8 @@ from .views import (
     MediaUploadURLView,
     NearbyReportView,
     NearestBarangayView,
+    AdminPotentialDuplicateListView,
+    AdminPotentialDuplicateView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -34,6 +36,20 @@ urlpatterns = [
         'admin/',
         AdminListReportView.as_view(),
         name='admin-report-list'
+    ),
+
+    # Admin potential duplicate listing
+    path(
+        'admin/potential-duplicates/',
+        AdminPotentialDuplicateListView.as_view(),
+        name='admin-potential-duplicate-list'
+    ),
+
+    # Admin potential duplicate retrieval/update
+    path(
+        'admin/potential-duplicates/<int:pk>/',
+        AdminPotentialDuplicateView.as_view(),
+        name='admin-potential-duplicate-detail'
     ),
 
     # Admin report retrieval/update
