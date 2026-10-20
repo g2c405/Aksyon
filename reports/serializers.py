@@ -1,14 +1,13 @@
 from rest_framework import serializers
-from .models import Report
+from .models import Report, PotentialDuplicate
 from users.serializers import UserSerializer
 from .services.storage import create_signed_read_url
 from .utils import get_media_type
-from .models import Report, PotentialDuplicate
+
 
 class ReportSerializer(serializers.ModelSerializer):
-    description = serializers.CharField(
-        max_length=200
-    )
+    description = serializers.CharField(max_length=200)
+
     class Meta:
         model = Report
         fields = (
@@ -19,16 +18,19 @@ class ReportSerializer(serializers.ModelSerializer):
             "barangay",
             "city",
             "description",
+            "category",
             "media",
             "media_thumbnail",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
             "city",
             "id",
@@ -49,12 +51,14 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "barangay",
             "city",
             "description",
+            "category",
             "media",
             "media_thumbnail",
             "image_url",
             "video_thumbnail_url",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
         )
         read_only_fields = (
@@ -63,6 +67,7 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "city",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
             "image_url",
             "video_thumbnail_url",
@@ -83,6 +88,7 @@ class ReportDetailSerializer(serializers.ModelSerializer):
 
         return create_signed_read_url(obj.media_thumbnail)
 
+
 class ReportListSerializer(serializers.ModelSerializer):
     video_thumbnail_url = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
@@ -97,16 +103,19 @@ class ReportListSerializer(serializers.ModelSerializer):
             "barangay",
             "city",
             "description",
+            "category",
             "image_url",
             "video_thumbnail_url",
             "status",
             "created_at",
-           "resolved_at",
+            "ongoing_at",
+            "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
             "city",
             "id",
@@ -142,16 +151,19 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "barangay",
             "city",
             "description",
+            "category",
             "image_url",
             "video_thumbnail_url",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
             "city",
             "id",
@@ -186,10 +198,12 @@ class AdminReportDetailSerializer(serializers.ModelSerializer):
             "barangay",
             "city",
             "description",
+            "category",
             "media",
             "media_thumbnail",
             "status",
             "created_at",
+            "ongoing_at",
             "resolved_at",
         )
 
@@ -241,6 +255,7 @@ class AdminPotentialDuplicateListSerializer(serializers.ModelSerializer):
             "created_at",
         )
 
+
 class AdminPotentialDuplicateDetailSerializer(serializers.ModelSerializer):
     report = AdminReportDetailSerializer(read_only=True)
     potential_duplicate = AdminReportDetailSerializer(read_only=True)
@@ -259,6 +274,7 @@ class AdminPotentialDuplicateDetailSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         )
+
 
 class AdminPotentialDuplicateUpdateSerializer(serializers.ModelSerializer):
     class Meta:

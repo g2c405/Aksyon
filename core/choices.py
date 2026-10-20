@@ -53,3 +53,11 @@ class DuplicateStatus(models.TextChoices):
     CONFIRMED = "confirmed", "Confirmed"
     DISMISSED = "dismissed", "Dismissed"
 
+class Category(models.TextChoices):
+        ROAD_ACCIDENT = 'road_accident', 'Road Accident'
+        FIRE = 'fire', 'Fire'
+        NATURAL_HAZARD = 'natural_hazard', 'Flooding and Natural Hazards'
+        MEDICAL_EMERGENCY = 'medical_emergency', 'Medical Emergency'
+        INFRASTRUCTURE_HAZARD = 'infrastructure_hazard', 'Infrastructure Hazard'
+        PUBLIC_SAFETY = 'public_safety', 'Public Safety Incident'
+        OTHER = 'other', 'Other'
