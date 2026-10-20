@@ -130,7 +130,25 @@ class ChangeEmailSerializer(serializers.Serializer):
 class ChangeContactNumberSerializer(serializers.Serializer):
     contact_number = serializers.CharField(
         required=True,
+        max_length=20,
+        trim_whitespace=True,
     )
+
+    def validate_contact_number(self, value):
+        user = self.context["request"].user
+
+        if not value:
+            raise serializers.ValidationError(
+                "Contact number is required."
+            )
+
+        if value == user.contact_number:
+            raise serializers.ValidationError(
+                "New contact number must be different "
+                "from your current contact number."
+            )
+
+        return value
 
 class AdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)

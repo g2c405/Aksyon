@@ -15,6 +15,7 @@ from django.shortcuts import render
 from .utils import (
     generate_password_reset_token,
     generate_email_change_token,
+    generate_contact_number_change_token
 )
 from django.core import signing
 import resend
@@ -416,33 +417,152 @@ class ChangeContactNumberView(APIView):
     def post(self, request):
         serializer = ChangeContactNumberSerializer(
             data=request.data,
+            context={"request": request},
         )
 
         serializer.is_valid(raise_exception=True)
 
-        with transaction.atomic():
-            request.user.contact_number = (
-                serializer.validated_data["contact_number"]
+        user = request.user
+        new_contact_number = (
+            serializer.validated_data["contact_number"]
+        )
+
+        if not user.email:
+            return Response(
+                {
+                    "detail": (
+                        "An email address is required to verify "
+                        "your contact number change."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-            request.user.save(
-                update_fields=["contact_number"]
-            )
+        token = generate_contact_number_change_token(
+            user,
+            new_contact_number,
+        )
 
-            create_account_change_notification(
-                request.user,
-                "contact_changed",
-            )
+        verification_url = (
+            f"{settings.BACKEND_URL}/api/users/"
+            f"verify-contact-number-change/{token}/"
+        )
+
+        resend.api_key = settings.RESEND_API_KEY
+
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [user.email],
+            "subject": "Verify your new contact number",
+            "text": (
+                "You requested to change the contact number "
+                "associated with your Aksyon account.\n\n"
+                "Please verify this change by opening the link "
+                "below:\n\n"
+                f"{verification_url}\n\n"
+                "Your current contact number will remain unchanged "
+                "until you complete verification.\n\n"
+                "If you did not request this change, you can "
+                "ignore this email."
+            ),
+        })
 
         return Response(
             {
                 "message": (
-                    "Contact number changed successfully."
+                    "A verification link has been sent to your "
+                    "registered email address."
                 )
             },
             status=status.HTTP_200_OK,
         )
 
+class VerifyContactNumberChangeView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        try:
+            data = signing.loads(
+                token,
+                salt="contact-number-change",
+                max_age=3600,
+            )
+        except signing.BadSignature:
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": (
+                        "This contact number change link is "
+                        "invalid or has expired."
+                    ),
+                },
+                status=400,
+            )
+
+        try:
+            user = User.objects.get(
+                pk=data["user_id"]
+            )
+        except (User.DoesNotExist, KeyError):
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": (
+                        "This verification link is invalid."
+                    ),
+                },
+                status=400,
+            )
+
+        new_contact_number = data["new_contact_number"]
+
+        # Include this check only if contact numbers must be unique.
+        if User.objects.filter(
+            contact_number=new_contact_number
+        ).exclude(
+            pk=user.pk
+        ).exists():
+            return render(
+                request,
+                "users/email_verification.html",
+                {
+                    "success": False,
+                    "message": (
+                        "This contact number is already associated "
+                        "with another account."
+                    ),
+                },
+                status=400,
+            )
+
+        with transaction.atomic():
+            user.contact_number = new_contact_number
+
+            user.save(
+                update_fields=["contact_number"]
+            )
+
+            create_account_change_notification(
+                user,
+                "contact_changed",
+            )
+
+        return render(
+            request,
+            "users/email_verification.html",
+            {
+                "success": True,
+                "message": (
+                    "Your contact number has been changed "
+                    "successfully."
+                ),
+            },
+            status=200,
+        )
 
 class ResetPasswordView(APIView):
     permission_classes = [permissions.AllowAny]

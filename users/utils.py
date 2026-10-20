@@ -18,3 +18,15 @@ def generate_email_change_token(user, new_email):
         },
         salt="email-change",
     )
+
+from django.core import signing
+
+
+def generate_contact_number_change_token(user, new_contact_number):
+    return signing.dumps(
+        {
+            "user_id": user.pk,
+            "new_contact_number": new_contact_number,
+        },
+        salt="contact-number-change",
+    )

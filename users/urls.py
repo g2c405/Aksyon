@@ -17,6 +17,7 @@ from .views import (
     VerifyEmailChangeView,
     ChangeContactNumberView,
     PasswordResetPageView,
+    VerifyContactNumberChangeView
 )
 from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [
@@ -53,5 +54,10 @@ urlpatterns = [
         "reset-password-page/<int:user_id>/<str:token>/",
         PasswordResetPageView.as_view(),
         name="reset-password-page",
+    ),
+    path(
+        "verify-contact-number-change/<str:token>/",
+        VerifyContactNumberChangeView.as_view(),
+        name="verify-contact-number-change",
     ),
 ]
