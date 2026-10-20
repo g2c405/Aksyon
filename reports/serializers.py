@@ -100,6 +100,7 @@ class ReportListSerializer(serializers.ModelSerializer):
             "image_url",
             "video_thumbnail_url",
             "status",
+            "created_at",
            "resolved_at",
         )
         read_only_fields = (
