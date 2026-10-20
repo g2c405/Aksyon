@@ -23,11 +23,13 @@ class ReportSerializer(serializers.ModelSerializer):
             "media_thumbnail",
             "status",
             "created_at",
+            "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "resolved_at",
             "city",
             "id",
         )
@@ -53,6 +55,7 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "video_thumbnail_url",
             "status",
             "created_at",
+            "resolved_at",
         )
         read_only_fields = (
             "id",
@@ -60,6 +63,7 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "city",
             "status",
             "created_at",
+            "resolved_at",
             "image_url",
             "video_thumbnail_url",
         )
@@ -96,12 +100,13 @@ class ReportListSerializer(serializers.ModelSerializer):
             "image_url",
             "video_thumbnail_url",
             "status",
-            "created_at",
+           "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "resolved_at",
             "city",
             "id",
         )
@@ -140,11 +145,13 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "video_thumbnail_url",
             "status",
             "created_at",
+            "resolved_at",
         )
         read_only_fields = (
             "user",
             "status",
             "created_at",
+            "resolved_at",
             "city",
             "id",
         )
@@ -182,6 +189,7 @@ class AdminReportDetailSerializer(serializers.ModelSerializer):
             "media_thumbnail",
             "status",
             "created_at",
+            "resolved_at",
         )
 
 
