@@ -32,24 +32,29 @@ class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
 
     def get_queryset(self):
-        now = timezone.now()
-        cutoff = now - timedelta(hours=24)
-
-        return (
-            Report.objects
-            .filter(
-                user=self.request.user,
-            )
-            .filter(
-                ~Q(status=Status.RESOLVED) |
-                Q(
-                    status=Status.RESOLVED,
-                    resolved_at__gte=cutoff,
-                )
-            )
-            .order_by("-created_at")
+        reports = Report.objects.filter(
+            user=self.request.user,
         )
 
+        # Hide old resolved reports from the default list.
+        if self.action == "list":
+            include_archived = (
+                self.request.query_params.get("include_archived")
+                == "true"
+            )
+
+            if not include_archived:
+                cutoff = timezone.now() - timedelta(hours=24)
+
+                reports = reports.filter(
+                    ~Q(status=Status.RESOLVED) |
+                    Q(
+                        status=Status.RESOLVED,
+                        resolved_at__gte=cutoff,
+                    )
+                )
+
+        return reports.order_by("-created_at")
     def get_serializer_class(self):
         if self.action == "list":
             return ReportListSerializer
