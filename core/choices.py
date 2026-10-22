@@ -73,3 +73,74 @@ class DismissalReason(models.TextChoices):
         "inappropriate_media",
         "Inappropriate media evidence",
     )
+
+class AccountSuspensionReason(models.TextChoices):
+    INAPPROPRIATE_USER_INFORMATION = (
+        "inappropriate_user_information",
+        "Inappropriate user information",
+    )
+    REPORTING_SYSTEM_ABUSE = (
+        "reporting_system_abuse",
+        "Abuse of the reporting system",
+    )
+    INAPPROPRIATE_CONTENT = (
+        "inappropriate_content",
+        "Inappropriate content",
+    )
+    REPEATED_POLICY_VIOLATIONS = (
+        "repeated_policy_violations",
+        "Repeated policy violations",
+    )
+    OTHER = "other", "Other"
+
+
+class AccountSuspensionDetail(models.TextChoices):
+    # Inappropriate user information
+    INAPPROPRIATE_FIRST_NAME = (
+        "inappropriate_first_name", "Inappropriate first name"
+    )
+    INAPPROPRIATE_LAST_NAME = (
+        "inappropriate_last_name", "Inappropriate last name"
+    )
+    INAPPROPRIATE_USERNAME = (
+        "inappropriate_username", "Inappropriate username"
+    )
+    INAPPROPRIATE_PROFILE_INFORMATION = (
+        "inappropriate_profile_information",
+        "Inappropriate profile information",
+    )
+    FALSE_CONTACT_INFORMATION = (
+        "false_contact_information", "False or misleading contact information"
+    )
+
+    # Abuse of the reporting system
+    FALSE_REPORTS = (
+        "false_reports", "Repeated false or fabricated reports"
+    )
+    MISLEADING_DESCRIPTIONS = (
+        "misleading_descriptions", "Deliberately misleading report descriptions"
+    )
+    SPAM_OR_DUPLICATE_REPORTS = (
+        "spam_or_duplicate_reports", "Repeated duplicate or spam reports"
+    )
+    REPORT_LOCATION_MISUSE = (
+        "report_location_misuse", "Deliberate misuse of report locations"
+    )
+
+    # Inappropriate content
+    PROFANITY_OR_ABUSE = (
+        "profanity_or_abuse", "Profanity or abusive language in reports"
+    )
+    INAPPROPRIATE_MEDIA = (
+        "inappropriate_media", "Inappropriate media uploads"
+    )
+    HARASSMENT_OR_THREATS = (
+        "harassment_or_threats", "Harassment or threatening content"
+    )
+
+    # Other
+    REPEATED_GUIDELINE_VIOLATIONS = (
+        "repeated_guideline_violations",
+        "Repeated violations of reporting guidelines",
+    )
+    OTHER_DETAIL = "other_detail", "Other"

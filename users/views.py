@@ -147,6 +147,23 @@ class LoginView(ObtainAuthToken):
         )
 
         if user is None:
+            inactive_user = User.objects.filter(
+                username=username,
+                is_active=False,
+            ).first()
+
+            if inactive_user and inactive_user.check_password(password or ""):
+                return Response(
+                    {
+                        "detail": (
+                            "Your account has been disabled. "
+                            "Please contact your barangay administrator."
+                        ),
+                        "code": "account_disabled",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             return Response(
                 {"detail": "Invalid username or password."},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -160,13 +177,9 @@ class LoginView(ObtainAuthToken):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        token, created = Token.objects.get_or_create(
-            user=user
-        )
+        token, created = Token.objects.get_or_create(user=user)
 
-        return Response({
-            "token": token.key,
-        })
+        return Response({"token": token.key})
 
 
 class RegisterView(CreateAPIView):
