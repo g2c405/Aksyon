@@ -47,6 +47,7 @@ class Status(models.TextChoices):
     PENDING = "pending", "Pending"
     ONGOING = "ongoing", "Ongoing"
     RESOLVED = "resolved", "Resolved"
+    DISMISSED = "dismissed", "Dismissed"
 
 class DuplicateStatus(models.TextChoices):
     PENDING = "pending", "Pending"
@@ -61,3 +62,14 @@ class Category(models.TextChoices):
         INFRASTRUCTURE_HAZARD = 'infrastructure_hazard', 'Infrastructure Hazard'
         PUBLIC_SAFETY = 'public_safety', 'Public Safety Incident'
         OTHER = 'other', 'Other'
+
+class DismissalReason(models.TextChoices):
+    PROFANITY = "profanity", "Profanity in description"
+    INCORRECT_BARANGAY = (
+        "incorrect_barangay",
+        "Incorrect barangay selected",
+    )
+    INAPPROPRIATE_MEDIA = (
+        "inappropriate_media",
+        "Inappropriate media evidence",
+    )

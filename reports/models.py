@@ -1,9 +1,13 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from core.choices import Barangay
-from core.choices import Status
-from core.choices import DuplicateStatus, Category
+from core.choices import (
+    Barangay,
+    Status,
+    DuplicateStatus,
+    Category,
+    DismissalReason,
+)
 # Create your models here.
 class Report(models.Model):
     user = models.ForeignKey(
@@ -33,6 +37,12 @@ class Report(models.Model):
         max_length=20,
         choices=Status.choices,
         default=Status.PENDING
+    )
+    dismissal_reason = models.CharField(
+        max_length=30,
+        choices=DismissalReason.choices,
+        null=True,
+        blank=True,
     )
 
     def __str__(self):

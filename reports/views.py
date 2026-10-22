@@ -35,7 +35,10 @@ from core.barangays import get_barangay_halls
 from core.choices import Status, DuplicateStatus
 
 from notifications.models import Notification
-from notifications.templates import STATUS_NOTIFICATION_TEMPLATES
+from notifications.templates import (
+    STATUS_NOTIFICATION_TEMPLATES,
+    DISMISSAL_NOTIFICATION_TEMPLATES,
+)
 
 from users.permissions import IsUser, IsAdmin
 
@@ -241,6 +244,12 @@ class AdminReportView(RetrieveUpdateAPIView):
         now = timezone.now()
         update_fields = []
 
+        # A dismissal reason only applies while the report is dismissed.
+        # Clear stale reasons when an admin moves the report to another status.
+        if report.status != Status.DISMISSED and report.dismissal_reason:
+            report.dismissal_reason = None
+            update_fields.append("dismissal_reason")
+
         if old_status != report.status:
             # Record when the report first enters the ongoing state.
             if (
@@ -250,7 +259,8 @@ class AdminReportView(RetrieveUpdateAPIView):
                 report.ongoing_at = now
                 update_fields.append("ongoing_at")
 
-            # Record when the report becomes resolved.
+            # Record when the report becomes resolved. Dismissing a report
+            # must never set resolved_at.
             if (
                 report.status == Status.RESOLVED
                 and report.resolved_at is None
@@ -258,8 +268,32 @@ class AdminReportView(RetrieveUpdateAPIView):
                 report.resolved_at = now
                 update_fields.append("resolved_at")
 
-            # Notify the owner of the new status.
-            create_status_notification(report)
+            # Automatically dismiss unresolved potential-duplicate flags when
+            # the report is moved to ongoing or resolved.
+            if report.status in (Status.ONGOING, Status.RESOLVED):
+                PotentialDuplicate.objects.filter(
+                    report=report,
+                ).exclude(
+                    status__in=[
+                        DuplicateStatus.CONFIRMED,
+                        DuplicateStatus.DISMISSED,
+                    ]
+                ).update(status=DuplicateStatus.DISMISSED)
+
+            if report.status == Status.DISMISSED:
+                # Send a user warning specific to the selected dismissal reason.
+                template = DISMISSAL_NOTIFICATION_TEMPLATES.get(
+                    report.dismissal_reason
+                )
+                if template:
+                    Notification.objects.create(
+                        user=report.user,
+                        report=report,
+                        **template,
+                    )
+            else:
+                # Preserve the existing status-update notification behavior.
+                create_status_notification(report)
 
         if update_fields:
             report.save(update_fields=update_fields)

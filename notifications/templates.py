@@ -1,6 +1,6 @@
 
 from core.choices import Status
-
+from core.choices import Status, DismissalReason
 STATUS_NOTIFICATION_TEMPLATES = {
     Status.PENDING: {
             "notification_type": "report_update",
@@ -31,4 +31,32 @@ ANNOUNCEMENT_NOTIFICATION_TEMPLATE = {
     "message": (
         "Your barangay has posted a new announcement."
     ),
+}
+
+DISMISSAL_NOTIFICATION_TEMPLATES = {
+    DismissalReason.PROFANITY: {
+        "notification_type": "user_warning",
+        "title": "Report dismissed",
+        "message": (
+            "Your report was dismissed because its description "
+            "contains profanity."
+        ),
+    },
+    DismissalReason.INCORRECT_BARANGAY: {
+        "notification_type": "user_warning",
+        "title": "Report dismissed",
+        "message": (
+            "Your report was dismissed because the selected "
+            "barangay was incorrect. Please submit it to the "
+            "appropriate barangay."
+        ),
+    },
+    DismissalReason.INAPPROPRIATE_MEDIA: {
+        "notification_type": "user_warning",
+        "title": "Report dismissed",
+        "message": (
+            "Your report was dismissed because the attached "
+            "media evidence was inappropriate."
+        ),
+    },
 }

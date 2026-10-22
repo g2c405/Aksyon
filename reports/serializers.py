@@ -3,7 +3,7 @@ from .models import Report, PotentialDuplicate
 from users.serializers import UserSerializer
 from .services.storage import create_signed_read_url
 from .utils import get_media_type
-
+from core.choices import Status, DismissalReason
 
 class ReportSerializer(serializers.ModelSerializer):
     description = serializers.CharField(max_length=200)
@@ -214,7 +214,38 @@ class AdminReportUpdateSerializer(serializers.ModelSerializer):
         fields = (
             "status",
             "barangay",
+            "dismissal_reason",
         )
+
+    def validate(self, attrs):
+        status_value = attrs.get(
+            "status",
+            self.instance.status if self.instance else None,
+        )
+        dismissal_reason = attrs.get(
+            "dismissal_reason",
+            self.instance.dismissal_reason if self.instance else None,
+        )
+
+        if status_value == Status.DISMISSED and not dismissal_reason:
+            raise serializers.ValidationError({
+                "dismissal_reason": (
+                    "A dismissal reason is required when dismissing a report."
+                )
+            })
+
+        if (
+            status_value != Status.DISMISSED
+            and "dismissal_reason" in attrs
+            and dismissal_reason
+        ):
+            raise serializers.ValidationError({
+                "dismissal_reason": (
+                    "A dismissal reason can only be set for dismissed reports."
+                )
+            })
+
+        return attrs
 
 
 class NearbyReportSerializer(serializers.ModelSerializer):
