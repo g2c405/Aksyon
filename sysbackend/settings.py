@@ -88,6 +88,7 @@ BACKEND_URL = os.getenv(
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://aksyon.vercel.app",
 ]
 
 MIDDLEWARE = [
