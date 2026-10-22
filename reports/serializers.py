@@ -25,13 +25,18 @@ class ReportSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
         )
+
         read_only_fields = (
             "user",
             "status",
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
             "city",
             "id",
         )
@@ -60,6 +65,9 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
         )
         read_only_fields = (
             "id",
@@ -69,6 +77,8 @@ class ReportDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
             "image_url",
             "video_thumbnail_url",
         )
@@ -110,6 +120,9 @@ class ReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
         )
         read_only_fields = (
             "user",
@@ -117,6 +130,8 @@ class ReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
             "city",
             "id",
         )
@@ -158,6 +173,8 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
         )
         read_only_fields = (
             "user",
@@ -165,6 +182,8 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
             "city",
             "id",
         )
@@ -205,6 +224,8 @@ class AdminReportDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "ongoing_at",
             "resolved_at",
+            "dismissed_at",
+            "dismissal_reason",
         )
 
 
