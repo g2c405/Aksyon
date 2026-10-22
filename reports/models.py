@@ -33,6 +33,7 @@ class Report(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     ongoing_at = models.DateTimeField(null=True, blank=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    dismissed_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

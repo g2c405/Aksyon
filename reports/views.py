@@ -238,6 +238,7 @@ class AdminReportView(RetrieveUpdateAPIView):
         return AdminReportDetailSerializer
 
     @transaction.atomic
+    @transaction.atomic
     def perform_update(self, serializer):
         old_status = serializer.instance.status
         report = serializer.save()
@@ -250,6 +251,11 @@ class AdminReportView(RetrieveUpdateAPIView):
             report.dismissal_reason = None
             update_fields.append("dismissal_reason")
 
+        # Clear dismissed_at if the report leaves the dismissed state.
+        if report.status != Status.DISMISSED and report.dismissed_at:
+            report.dismissed_at = None
+            update_fields.append("dismissed_at")
+
         if old_status != report.status:
             # Record when the report first enters the ongoing state.
             if (
@@ -259,14 +265,21 @@ class AdminReportView(RetrieveUpdateAPIView):
                 report.ongoing_at = now
                 update_fields.append("ongoing_at")
 
-            # Record when the report becomes resolved. Dismissing a report
-            # must never set resolved_at.
+            # Record when the report becomes resolved.
             if (
                 report.status == Status.RESOLVED
                 and report.resolved_at is None
             ):
                 report.resolved_at = now
                 update_fields.append("resolved_at")
+
+            # Record when the report becomes dismissed.
+            if (
+                report.status == Status.DISMISSED
+                and report.dismissed_at is None
+            ):
+                report.dismissed_at = now
+                update_fields.append("dismissed_at")
 
             # Automatically dismiss unresolved potential-duplicate flags when
             # the report is moved to ongoing or resolved.
@@ -297,7 +310,6 @@ class AdminReportView(RetrieveUpdateAPIView):
 
         if update_fields:
             report.save(update_fields=update_fields)
-
 
 class AdminReportVideoURLView(APIView):
     permission_classes = [IsAdmin]
