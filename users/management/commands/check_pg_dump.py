@@ -1,23 +1,21 @@
+
 import shutil
 
 from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = "Checks whether pg_dump is installed."
+    help = "Check whether PostgreSQL backup utilities are available."
 
     def handle(self, *args, **options):
-        pg_dump_path = shutil.which("pg_dump")
+        for utility in ("pg_dump", "pg_restore"):
+            path = shutil.which(utility)
 
-        if pg_dump_path:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"PG_DUMP_CHECK: available at {pg_dump_path}"
+            if path:
+                self.stdout.write(
+                    self.style.SUCCESS(f"{utility}: available at {path}")
                 )
-            )
-        else:
-            self.stdout.write(
-                self.style.WARNING(
-                    "PG_DUMP_CHECK: not installed or not in PATH"
+            else:
+                self.stdout.write(
+                    self.style.ERROR(f"{utility}: NOT FOUND")
                 )
-            )
