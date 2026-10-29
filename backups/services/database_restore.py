@@ -232,9 +232,11 @@ def restore_database_backup(filename):
                 "The selected backup failed archive validation."
             )
 
+        
         command = [
             "pg_restore",
             *base_command,
+            "--schema=public",
             "--clean",
             "--if-exists",
             "--no-owner",
@@ -243,6 +245,7 @@ def restore_database_backup(filename):
             "--exit-on-error",
             str(dump_path),
         ]
+
 
         try:
             result = subprocess.run(
