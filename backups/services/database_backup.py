@@ -66,6 +66,7 @@ def create_database_backup():
 
         command = [
             "pg_dump",
+            "--schema=public",
             "--host", parsed_url.hostname,
             "--port", str(parsed_url.port or 5432),
             "--username", username,
