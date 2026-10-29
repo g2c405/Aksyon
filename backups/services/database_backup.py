@@ -162,3 +162,48 @@ def create_database_backup():
             "size_bytes": file_size,
             "created_at": timestamp,
         }
+
+
+def list_database_backups():
+    """
+    Return database backup files stored in the private Supabase bucket.
+    """
+    try:
+        supabase = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SECRET_KEY,
+        )
+
+        files = supabase.storage.from_(
+            BUCKET_NAME
+        ).list()
+
+    except Exception as exc:
+        logger.exception("Failed to list database backups.")
+        raise BackupError(
+            "Could not retrieve database backups."
+        ) from exc
+
+    backups = []
+
+    for file in files:
+        filename = file.get("name", "")
+
+        if not filename.endswith(".dump"):
+            continue
+
+        metadata = file.get("metadata") or {}
+
+        backups.append({
+            "filename": filename,
+            "size_bytes": metadata.get("size"),
+            "created_at": file.get("created_at"),
+            "updated_at": file.get("updated_at"),
+        })
+
+    backups.sort(
+        key=lambda item: item["created_at"] or "",
+        reverse=True,
+    )
+
+    return backups
