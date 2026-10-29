@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from supabase import create_client
-
+from django.db import connection
 logger = logging.getLogger(__name__)
 
 BUCKET_NAME = "aksyon-backups"
@@ -39,16 +39,37 @@ class RestoreError(Exception):
 class RestoreRejected(Exception):
     """Raised when a restore request fails a safety check."""
 
+
 def ensure_database_is_ready_for_restore():
     """
-    Allow restoration only when application tables are empty,
-    apart from the expected startup-created admin accounts.
+    Permit restoration into a genuinely empty database schema.
+    Otherwise, require the expected application tables to exist
+    and reject restoration if unexpected data is present.
     """
     User = get_user_model()
+
+    # Inspect the schema before querying Django models.
+    existing_tables = set(
+        connection.introspection.table_names()
+    )
+
+    # The schema was dropped or the database has no visible tables.
+    # Allow the restore service to proceed to archive validation.
+    if not existing_tables:
+        return
+
+    # A partially missing schema is not safe to restore over blindly.
+    if User._meta.db_table not in existing_tables:
+        raise RestoreRejected(
+            "Restore refused: the database schema is partially "
+            "initialized. Restore only into an empty schema or "
+            "a fully initialized, empty application database."
+        )
 
     privileged_username = os.environ.get(
         "PRIVILEGED_ADMIN_USERNAME"
     )
+
     if not privileged_username:
         raise RestoreError(
             "PRIVILEGED_ADMIN_USERNAME is not configured."
@@ -63,10 +84,11 @@ def ensure_database_is_ready_for_restore():
         username__in=allowed_usernames
     ).exists():
         raise RestoreRejected(
-            "Restore refused: unexpected user accounts exist. "
-            "The database must be empty apart from default admin accounts."
+            "Restore refused: unexpected user accounts exist."
         )
 
+    # Verify that the expected application tables exist before
+    # querying their models.
     for model in apps.get_models():
         if (
             model._meta.app_label not in APPLICATION_APP_LABELS
@@ -74,15 +96,20 @@ def ensure_database_is_ready_for_restore():
             or model._meta.proxy
             or model._meta.abstract
             or model._meta.auto_created
+            or not model._meta.managed
         ):
             continue
 
-        if model.objects.exists():
+        if model._meta.db_table not in existing_tables:
             raise RestoreRejected(
-                "Restore refused: application data already exists. "
-                "Only restore into an empty application database."
+                "Restore refused: an application table is missing. "
+                "The database schema is incomplete."
             )
 
+        if model.objects.exists():
+            raise RestoreRejected(
+                "Restore refused: application data already exists."
+            )
 
 def _get_database_connection():
     database_url = os.environ.get("DATABASE_URL")
