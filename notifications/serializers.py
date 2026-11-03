@@ -1,6 +1,5 @@
 from rest_framework import serializers
-from .models import Notification
-
+from .models import Notification, DevicePushToken
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
@@ -22,4 +21,20 @@ class NotificationSerializer(serializers.ModelSerializer):
             "title",
             "message",
             "created_at",
+        )
+
+class DevicePushTokenSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DevicePushToken
+        fields = (
+            "id",
+            "expo_push_token",
+            "device_id",
+            "platform",
+            "is_active",
+        )
+        read_only_fields = (
+            "id",
+            "is_active",
         )

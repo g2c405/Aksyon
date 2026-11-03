@@ -25,7 +25,7 @@ from django.contrib.auth.password_validation import validate_password
 from .serializers import ChangePasswordSerializer, ChangeEmailSerializer, ChangeContactNumberSerializer
 from .serializers import AdminCreateSerializer
 from core.choices import Role
-
+from notifications.services import create_notification
 # Added for account-change notifications
 from django.db import transaction
 from notifications.models import Notification
@@ -69,7 +69,7 @@ def create_account_change_notification(user, event):
 
     content = notification_content[event]
 
-    return Notification.objects.create(
+    return create_notification(
         user=user,
         notification_type="user_warning",
         title=content["title"],

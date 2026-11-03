@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from users.permissions import IsUser, IsAdmin
 from django.contrib.auth import get_user_model
+from notifications.services import create_notification
 User = get_user_model()
 from .models import Announcement
 from .serializers import (
@@ -101,7 +102,7 @@ class AnnouncementViewSet(ModelViewSet):
         )
 
         for user in users:
-            Notification.objects.create(
+            create_notification(
                 user=user,
                 announcement=announcement,
                 **ANNOUNCEMENT_NOTIFICATION_TEMPLATE,

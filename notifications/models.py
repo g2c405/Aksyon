@@ -46,3 +46,47 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class DevicePushToken(models.Model):
+
+    class Platform(models.TextChoices):
+        ANDROID = "android", "Android"
+        IOS = "ios", "iOS"
+        UNKNOWN = "unknown", "Unknown"
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="push_devices",
+    )
+
+    expo_push_token = models.CharField(
+        max_length=255,
+        unique=True,
+    )
+
+    device_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    platform = models.CharField(
+        max_length=20,
+        choices=Platform.choices,
+        default=Platform.UNKNOWN,
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.platform}"

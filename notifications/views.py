@@ -5,7 +5,9 @@ from rest_framework.response import Response
 from .models import Notification
 from .serializers import NotificationSerializer
 from users.permissions import IsUser, IsAdmin
-
+from .models import DevicePushToken
+from .serializers import DevicePushTokenSerializer
+from rest_framework.views import APIView
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [IsUser]
@@ -31,5 +33,57 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(
             self.get_serializer(notification).data,
+            status=status.HTTP_200_OK,
+        )
+
+class DevicePushTokenRegisterView(APIView):
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        serializer = DevicePushTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        token = serializer.validated_data["expo_push_token"]
+
+        device, created = DevicePushToken.objects.update_or_create(
+            expo_push_token=token,
+            defaults={
+                "user": request.user,
+                "device_id": serializer.validated_data.get(
+                    "device_id", ""
+                ),
+                "platform": serializer.validated_data.get(
+                    "platform", "unknown"
+                ),
+                "is_active": True,
+            },
+        )
+
+        return Response(
+            DevicePushTokenSerializer(device).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class DevicePushTokenDeactivateView(APIView):
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        token = request.data.get("expo_push_token")
+
+        if not token:
+            return Response(
+                {"detail": "expo_push_token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated = DevicePushToken.objects.filter(
+            user=request.user,
+            expo_push_token=token,
+            is_active=True,
+        ).update(is_active=False)
+
+        return Response(
+            {"detail": "Device token deactivated."},
             status=status.HTTP_200_OK,
         )

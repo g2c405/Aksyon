@@ -11,7 +11,7 @@ from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
-
+from notifications.services import create_notification
 from .models import Report, PotentialDuplicate
 from .serializers import (
     ReportSerializer,
@@ -44,18 +44,16 @@ from users.permissions import IsUser, IsAdmin
 
 
 def create_status_notification(report):
-    """Create a notification using the template for the report's current status."""
     template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
 
     if not template:
         return
 
-    Notification.objects.create(
+    create_notification(
         user=report.user,
         report=report,
         **template,
     )
-
 
 class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
@@ -299,7 +297,7 @@ class AdminReportView(RetrieveUpdateAPIView):
                     report.dismissal_reason
                 )
                 if template:
-                    Notification.objects.create(
+                    create_notification(
                         user=report.user,
                         report=report,
                         **template,
