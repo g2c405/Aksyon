@@ -321,10 +321,21 @@ class AdminCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        if not attrs.get("assigned_barangay"):
+        assigned_barangay = attrs.get("assigned_barangay")
+
+        if not assigned_barangay:
             raise serializers.ValidationError({
-                "assigned_barangay":
-                    "An admin must be assigned to a barangay."
+                "assigned_barangay": "An admin must be assigned to a barangay."
+            })
+
+        if User.objects.filter(
+            role=Role.ADMIN,
+            assigned_barangay=assigned_barangay,
+        ).exists():
+            raise serializers.ValidationError({
+                "assigned_barangay": (
+                    "A barangay admin account already exists for this barangay."
+                )
             })
 
         return attrs

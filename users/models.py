@@ -7,7 +7,7 @@ from core.choices import (
     AccountSuspensionDetail,
 )
 # accounts/models.py
-
+from django.db.models import Q
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator
@@ -74,6 +74,19 @@ class User(AbstractUser):
     )
 
     email_verified = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assigned_barangay"],
+                condition=(
+                    Q(role=Role.ADMIN)
+                    & Q(assigned_barangay__isnull=False)
+                    & ~Q(assigned_barangay="")
+                ),
+                name="unique_barangay_admin_per_barangay",
+            ),
+        ]
 
     def __str__(self):
         return self.username
