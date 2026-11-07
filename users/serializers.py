@@ -418,22 +418,40 @@ class AdminSerializer(serializers.ModelSerializer):
             "date_joined",
         )
 
-class AdminUpdateSerializer(
-    AccountStatusUpdateMixin,
-    serializers.ModelSerializer,
-):
+class AdminUpdateSerializer(AccountStatusUpdateMixin, serializers.ModelSerializer):
+
     class Meta:
         model = User
         fields = (
+            "username",
+            "first_name",
+            "last_name",
             "email",
-            "is_active",
             "contact_number",
             "assigned_barangay",
+            "is_active",
             "suspension_reason",
             "suspension_detail",
             "suspension_notes",
         )
 
+    def validate_assigned_barangay(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "A barangay admin must be assigned to a barangay."
+            )
+
+        existing_admin = User.objects.filter(
+            role=Role.ADMIN,
+            assigned_barangay=value,
+        ).exclude(pk=self.instance.pk)
+
+        if existing_admin.exists():
+            raise serializers.ValidationError(
+                "A barangay admin account already exists for this barangay."
+            )
+
+        return value
 class PrivilegedAdminMeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

@@ -188,7 +188,7 @@ class ResendRegistrationOTPView(APIView):
         )
 
 class ResendEmailChangeOTPView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         otp = (
@@ -390,7 +390,7 @@ class ChangePasswordView(APIView):
 
 
 class ChangeEmailView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         serializer = ChangeEmailSerializer(
@@ -429,7 +429,7 @@ class ChangeEmailView(APIView):
         )
 
 class VerifyEmailChangeView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         serializer = VerifyEmailOTPSerializer(data=request.data)
@@ -503,7 +503,7 @@ class VerifyEmailChangeView(APIView):
         )
 
 class ChangeContactNumberView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         serializer = ChangeContactNumberSerializer(
@@ -556,7 +556,7 @@ class ChangeContactNumberView(APIView):
         )
 
 class VerifyContactNumberChangeView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         serializer = VerifyEmailOTPSerializer(data=request.data)
@@ -630,7 +630,7 @@ class VerifyContactNumberChangeView(APIView):
         )
 
 class ResendContactNumberChangeOTPView(APIView):
-    permission_classes = [IsUser | IsAdmin]
+    permission_classes = [IsUser | IsPrivilegedAdmin]
 
     def post(self, request):
         otp = (
