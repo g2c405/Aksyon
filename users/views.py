@@ -35,11 +35,13 @@ from rest_framework.permissions import AllowAny
 from .models import User, EmailVerificationOTP
 from .serializers import VerifyEmailOTPSerializer
 from .otp_services import (
+    issue_otp,
     verify_user_otp,
     OTPNotFound,
     OTPExpired,
     OTPInvalid,
     OTPMaxAttempts,
+    OTPResendCooldown,
 )
 def create_account_change_notification(user, event):
     notification_content = {
@@ -150,6 +152,39 @@ class VerifyEmailView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class ResendRegistrationOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, user_id):
+        user = get_object_or_404(User, pk=user_id)
+
+        if user.email_verified:
+            return Response(
+                {"detail": "Email address is already verified."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            issue_otp(
+                user=user,
+                purpose=EmailVerificationOTP.Purpose.REGISTRATION,
+                recipient=user.email,
+            )
+
+        except OTPResendCooldown as error:
+            return Response(
+                {
+                    "detail": str(error),
+                    "retry_after": error.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(error.retry_after)},
+            )
+
+        return Response(
+            {"detail": "A new verification code has been sent."},
+            status=status.HTTP_200_OK,
+        )
 
 class LoginView(ObtainAuthToken):
     permission_classes = [permissions.AllowAny]
