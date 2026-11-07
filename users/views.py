@@ -510,150 +510,174 @@ class ChangeContactNumberView(APIView):
             data=request.data,
             context={"request": request},
         )
-
         serializer.is_valid(raise_exception=True)
 
-        user = request.user
-        new_contact_number = (
-            serializer.validated_data["contact_number"]
-        )
+        new_contact_number = serializer.validated_data["new_contact_number"]
 
-        if not user.email:
+        if not request.user.email:
             return Response(
-                {
-                    "detail": (
-                        "An email address is required to verify "
-                        "your contact number change."
-                    )
-                },
+                {"detail": "Your account does not have a registered email address."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        token = generate_contact_number_change_token(
-            user,
-            new_contact_number,
-        )
+        if User.objects.filter(
+            contact_number=new_contact_number
+        ).exclude(pk=request.user.pk).exists():
+            return Response(
+                {"detail": "This contact number is already in use."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        verification_url = (
-            f"{settings.BACKEND_URL}/api/users/"
-            f"verify-contact-number-change/{token}/"
-        )
+        try:
+            issue_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.CONTACT_CHANGE,
+                recipient=request.user.email,
+                target_value=new_contact_number,
+            )
 
-        resend.api_key = settings.RESEND_API_KEY
-
-        resend.Emails.send({
-            "from": settings.DEFAULT_FROM_EMAIL,
-            "to": [user.email],
-            "subject": "Verify your new contact number",
-            "text": (
-                "You requested to change the contact number "
-                "associated with your Aksyon account.\n\n"
-                "Please verify this change by opening the link "
-                "below:\n\n"
-                f"{verification_url}\n\n"
-                "Your current contact number will remain unchanged "
-                "until you complete verification.\n\n"
-                "If you did not request this change, you can "
-                "ignore this email."
-            ),
-        })
+        except OTPResendCooldown as error:
+            return Response(
+                {
+                    "detail": str(error),
+                    "retry_after": error.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(error.retry_after)},
+            )
 
         return Response(
             {
-                "message": (
-                    "A verification link has been sent to your "
-                    "registered email address."
+                "detail": (
+                    "A verification code has been sent to your registered email address."
                 )
             },
             status=status.HTTP_200_OK,
         )
 
 class VerifyContactNumberChangeView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsUser | IsAdmin]
 
-    def get(self, request, token):
-        try:
-            data = signing.loads(
-                token,
-                salt="contact-number-change",
-                max_age=3600,
-            )
-        except signing.BadSignature:
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": (
-                        "This contact number change link is "
-                        "invalid or has expired."
-                    ),
-                },
-                status=400,
-            )
+    def post(self, request):
+        serializer = VerifyEmailOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        code = serializer.validated_data["code"]
 
         try:
-            user = User.objects.get(
-                pk=data["user_id"]
+            otp = verify_user_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.CONTACT_CHANGE,
+                submitted_code=code,
             )
-        except (User.DoesNotExist, KeyError):
-            return render(
-                request,
-                "users/email_verification.html",
+
+        except OTPNotFound:
+            return Response(
+                {"detail": "No active verification code was found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPExpired:
+            return Response(
+                {"detail": "Your verification code has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPInvalid:
+            return Response(
+                {"detail": "The verification code is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPMaxAttempts:
+            return Response(
                 {
-                    "success": False,
-                    "message": (
-                        "This verification link is invalid."
-                    ),
+                    "detail": (
+                        "Maximum verification attempts reached. "
+                        "Please request a new code."
+                    )
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        new_contact_number = data["new_contact_number"]
+        new_contact_number = otp.target_value
 
-        # Include this check only if contact numbers must be unique.
+        if not new_contact_number:
+            return Response(
+                {"detail": "The verification request is invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if User.objects.filter(
             contact_number=new_contact_number
-        ).exclude(
-            pk=user.pk
-        ).exists():
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": (
-                        "This contact number is already associated "
-                        "with another account."
-                    ),
-                },
-                status=400,
+        ).exclude(pk=request.user.pk).exists():
+            return Response(
+                {"detail": "This contact number is already in use."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            user.contact_number = new_contact_number
+        request.user.contact_number = new_contact_number
+        request.user.save(update_fields=["contact_number"])
 
-            user.save(
-                update_fields=["contact_number"]
-            )
-
-            create_account_change_notification(
-                user,
-                "contact_changed",
-            )
-
-        return render(
-            request,
-            "users/email_verification.html",
-            {
-                "success": True,
-                "message": (
-                    "Your contact number has been changed "
-                    "successfully."
-                ),
-            },
-            status=200,
+        create_account_change_notification(
+            request.user,
+            "contact_changed",
         )
+
+        return Response(
+            {"detail": "Contact number successfully updated."},
+            status=status.HTTP_200_OK,
+        )
+
+class ResendContactNumberChangeOTPView(APIView):
+    permission_classes = [IsUser | IsAdmin]
+
+    def post(self, request):
+        otp = (
+            EmailVerificationOTP.objects
+            .filter(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.CONTACT_CHANGE,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not otp or otp.consumed_at is not None or not otp.target_value:
+            return Response(
+                {"detail": "No pending contact number change was found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not request.user.email:
+            return Response(
+                {"detail": "Your account does not have a registered email address."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            issue_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.CONTACT_CHANGE,
+                recipient=request.user.email,
+                target_value=otp.target_value,
+            )
+
+        except OTPResendCooldown as error:
+            return Response(
+                {
+                    "detail": str(error),
+                    "retry_after": error.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(error.retry_after)},
+            )
+
+        return Response(
+            {"detail": "A new verification code has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
 
 class ResetPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
