@@ -278,13 +278,14 @@ class ChangeEmailSerializer(serializers.Serializer):
         return value
 
 class ChangeContactNumberSerializer(serializers.Serializer):
-    contact_number = serializers.CharField(
+    new_contact_number = serializers.CharField(
         required=True,
-        max_length=20,
+        max_length=11,
+        min_length=11,
         trim_whitespace=True,
     )
 
-    def validate_contact_number(self, value):
+    def validate_new_contact_number(self, value):
         user = self.context["request"].user
 
         if not value:

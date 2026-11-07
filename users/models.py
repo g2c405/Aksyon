@@ -10,13 +10,19 @@ from core.choices import (
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
+from django.core.validators import RegexValidator
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     contact_number = models.CharField(
-        max_length=20,
+        max_length=11,
         blank=True,
         null=True,
+        validators=[
+            RegexValidator(
+                regex=r"^\d{11}$",
+                message="Contact number must contain exactly 11 digits.",
+            )
+        ],
     )
     role = models.CharField(
         max_length=20,
