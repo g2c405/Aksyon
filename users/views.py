@@ -43,6 +43,7 @@ from .otp_services import (
     OTPMaxAttempts,
     OTPResendCooldown,
 )
+from django.utils import timezone
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -185,6 +186,53 @@ class ResendRegistrationOTPView(APIView):
             {"detail": "A new verification code has been sent."},
             status=status.HTTP_200_OK,
         )
+
+class ResendEmailChangeOTPView(APIView):
+    permission_classes = [IsUser | IsAdmin]
+
+    def post(self, request):
+        otp = (
+            EmailVerificationOTP.objects
+            .filter(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.EMAIL_CHANGE,
+                consumed_at__isnull=True,
+                expires_at__gt=timezone.now(),
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not otp or not otp.target_value:
+            return Response(
+                {"detail": "No pending email change was found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            issue_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.EMAIL_CHANGE,
+                recipient=otp.target_value,
+                target_value=otp.target_value,
+            )
+
+        except OTPResendCooldown as error:
+            return Response(
+                {
+                    "detail": str(error),
+                    "retry_after": error.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(error.retry_after)},
+            )
+
+        return Response(
+            {"detail": "A new verification code has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
 
 class LoginView(ObtainAuthToken):
     permission_classes = [permissions.AllowAny]
@@ -345,136 +393,111 @@ class ChangeEmailView(APIView):
     permission_classes = [IsUser | IsAdmin]
 
     def post(self, request):
-        serializer = ChangeEmailSerializer(
-            data=request.data,
-            context={"request": request},
-        )
-
+        serializer = ChangeEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         new_email = serializer.validated_data["new_email"]
 
-        token = generate_email_change_token(
-            request.user,
-            new_email,
-        )
+        try:
+            issue_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.EMAIL_CHANGE,
+                recipient=new_email,
+                target_value=new_email,
+            )
 
-        verification_url = (
-            f"{settings.BACKEND_URL}/api/users/"
-            f"verify-email-change/{token}/"
-        )
-
-        resend.api_key = settings.RESEND_API_KEY
-
-        resend.Emails.send({
-            "from": settings.DEFAULT_FROM_EMAIL,
-            "to": [new_email],
-            "subject": "Verify your new email address",
-            "text": (
-                "You requested to change the email address "
-                "associated with your Aksyon account.\n\n"
-                "Please verify your new email address by opening "
-                "the link below:\n\n"
-                f"{verification_url}\n\n"
-                "Your current email address will remain unchanged "
-                "until you complete this verification."
-            ),
-        })
+        except OTPResendCooldown as error:
+            return Response(
+                {
+                    "detail": str(error),
+                    "retry_after": error.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(error.retry_after)},
+            )
 
         return Response(
             {
-                "message": (
-                    "A verification link has been sent to your "
-                    "new email address."
+                "detail": (
+                    "A verification code has been sent to your new email address."
                 )
             },
             status=status.HTTP_200_OK,
         )
 
-
 class VerifyEmailChangeView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsUser | IsAdmin]
 
-    def get(self, request, token):
-        try:
-            data = signing.loads(
-                token,
-                salt="email-change",
-                max_age=3600,
-            )
-        except signing.BadSignature:
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": (
-                        "This email change link is invalid "
-                        "or has expired."
-                    ),
-                },
-                status=400,
-            )
+    def post(self, request):
+        serializer = VerifyEmailOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        code = serializer.validated_data["code"]
 
         try:
-            user = User.objects.get(
-                pk=data["user_id"]
+            otp = verify_user_otp(
+                user=request.user,
+                purpose=EmailVerificationOTP.Purpose.EMAIL_CHANGE,
+                submitted_code=code,
             )
-        except User.DoesNotExist:
-            return render(
-                request,
-                "users/email_verification.html",
+
+        except OTPNotFound:
+            return Response(
+                {"detail": "No active verification code was found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPExpired:
+            return Response(
+                {"detail": "Your verification code has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPInvalid:
+            return Response(
+                {"detail": "The verification code is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPMaxAttempts:
+            return Response(
                 {
-                    "success": False,
-                    "message": "This verification link is invalid.",
+                    "detail": (
+                        "Maximum verification attempts reached. "
+                        "Please request a new code."
+                    )
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        new_email = data["new_email"]
+        new_email = otp.target_value
 
-        if User.objects.filter(
-            email__iexact=new_email
-        ).exclude(
-            pk=user.pk
+        if not new_email:
+            return Response(
+                {"detail": "The verification request is invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(email__iexact=new_email).exclude(
+            pk=request.user.pk
         ).exists():
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": (
-                        "This email address is already associated "
-                        "with another account."
-                    ),
-                },
-                status=400,
+            return Response(
+                {"detail": "This email address is already in use."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            user.email = new_email
+        request.user.email = new_email
+        request.user.save(update_fields=["email"])
 
-            user.save(
-                update_fields=["email"]
-            )
-
-            create_account_change_notification(
-                user,
-                "email_changed",
-            )
-
-        return render(
-            request,
-            "users/email_verification.html",
-            {
-                "success": True,
-                "message": (
-                    "Your email address has been changed successfully."
-                ),
-            },
-            status=200,
+        create_account_change_notification(
+            request.user,
+            "email_changed",
         )
 
+        return Response(
+            {"detail": "Email address successfully updated."},
+            status=status.HTTP_200_OK,
+        )
 
 class ChangeContactNumberView(APIView):
     permission_classes = [IsUser | IsAdmin]
