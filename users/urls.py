@@ -23,7 +23,11 @@ from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
-    path("verify-email/<int:user_id>/<str:token>/", VerifyEmailView.as_view(), name="verify-email"),
+    path(
+        "verify-email/<int:user_id>/",
+        VerifyEmailView.as_view(),
+        name="verify-email",
+    ),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),

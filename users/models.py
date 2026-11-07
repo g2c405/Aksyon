@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from core.choices import (
     Role,
     Barangay,
@@ -70,3 +71,51 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+class EmailVerificationOTP(models.Model):
+
+    class Purpose(models.TextChoices):
+        REGISTRATION = "registration", "Registration"
+        EMAIL_CHANGE = "email_change", "Email Change"
+        CONTACT_CHANGE = "contact_change", "Contact Number Change"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="verification_otps",
+    )
+
+    purpose = models.CharField(
+        max_length=20,
+        choices=Purpose.choices,
+    )
+
+    # Store the hashed OTP, never the actual numeric code.
+    code_hash = models.CharField(max_length=128)
+
+    # Used for pending email addresses or contact numbers.
+    target_value = models.CharField(
+        max_length=254,
+        blank=True,
+        default="",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField()
+
+    consumed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    attempts = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "purpose"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.purpose}"

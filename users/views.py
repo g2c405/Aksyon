@@ -30,7 +30,17 @@ from notifications.services import create_notification
 from django.db import transaction
 from notifications.models import Notification
 
-
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import AllowAny
+from .models import User, EmailVerificationOTP
+from .serializers import VerifyEmailOTPSerializer
+from .otp_services import (
+    verify_user_otp,
+    OTPNotFound,
+    OTPExpired,
+    OTPInvalid,
+    OTPMaxAttempts,
+)
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -80,57 +90,64 @@ def create_account_change_notification(user, event):
 # Create your views here.
 
 class VerifyEmailView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [AllowAny]
 
-    def get(self, request, user_id, token):
-        try:
-            user = User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": "This verification link is invalid.",
-                },
-                status=400,
-            )
+    def post(self, request, user_id):
+        user = get_object_or_404(User, pk=user_id)
 
         if user.email_verified:
-            return render(
-                request,
-                "users/email_verification.html",
-                {
-                    "success": False,
-                    "message": "This email is already verified."
-                },
-                status=400,
+            return Response(
+                {"detail": "Email address is already verified."},
+                status=status.HTTP_200_OK,
             )
 
-        if not default_token_generator.check_token(
-            user,
-            token,
-        ):
-            return render(
-                request,
-                "users/email_verification.html",
+        serializer = VerifyEmailOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        code = serializer.validated_data["code"]
+
+        try:
+            verify_user_otp(
+                user=user,
+                purpose=EmailVerificationOTP.Purpose.REGISTRATION,
+                submitted_code=code,
+            )
+
+        except OTPNotFound:
+            return Response(
+                {"detail": "No active verification code was found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPExpired:
+            return Response(
+                {"detail": "Your verification code has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPInvalid:
+            return Response(
+                {"detail": "The verification code is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except OTPMaxAttempts:
+            return Response(
                 {
-                    "success": False,
-                    "message": "This verification link is invalid or has expired."
+                    "detail": (
+                        "Maximum verification attempts reached. "
+                        "Please request a new code."
+                    )
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         user.email_verified = True
         user.save(update_fields=["email_verified"])
 
-        return render(
-            request,
-            "users/email_verification.html",
-            {
-                "success": True
-            },
-            status=200,
+        return Response(
+            {"detail": "Email address successfully verified."},
+            status=status.HTTP_200_OK,
         )
 
 

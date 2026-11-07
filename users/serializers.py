@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 User = get_user_model()
 from django.contrib.auth.password_validation import validate_password
-from .utils import generate_email_verification_token
+from .models import EmailVerificationOTP
+from .otp_services import issue_otp
 import resend
 from django.conf import settings
 from django.db import transaction
@@ -167,6 +168,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
+            "id",
             "username",
             "email",
             "first_name",
@@ -175,6 +177,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             "contact_number",
             "residential_barangay",
         )
+        read_only_fields = ["id"]
 
     def validate_password(self, value):
         validate_password(value)
@@ -184,28 +187,23 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             user = User.objects.create_user(**validated_data)
 
-            token = generate_email_verification_token(user)
-
-            verification_url = (
-                f"{settings.BACKEND_URL}/api/users/"
-                f"verify-email/{user.id}/{token}/"
-            )
-
-            resend.api_key = settings.RESEND_API_KEY
-
-            resend.Emails.send({
-                "from": settings.DEFAULT_FROM_EMAIL,
-                "to": [user.email],
-                "subject": "Verify your email",
-                "text": (
-                    "Welcome!\n\n"
-                    "Please verify your email by opening the link below:\n\n"
-                    f"{verification_url}\n\n"
-                    "You must verify your email before you can log in."
-                ),
-            })
+            try:
+                issue_otp(
+                    user=user,
+                    purpose=EmailVerificationOTP.Purpose.REGISTRATION,
+                    recipient=user.email,
+                )
+            except Exception as error:
+                raise serializers.ValidationError({
+                    "email": (
+                        "Your account could not be registered because "
+                        "we were unable to send the verification code. "
+                        "Please try again."
+                    )
+                }) from error
 
             return user
+
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(
         write_only=True,
@@ -436,3 +434,11 @@ class PrivilegedAdminMeSerializer(serializers.ModelSerializer):
             'contact_number',
             'role',
         )
+
+class VerifyEmailOTPSerializer(serializers.Serializer):
+    code = serializers.RegexField(
+        regex=r"^\d{6}$",
+        error_messages={
+            "invalid": "Enter a valid 6-digit verification code."
+        }
+    )
