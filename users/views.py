@@ -393,7 +393,10 @@ class ChangeEmailView(APIView):
     permission_classes = [IsUser | IsAdmin]
 
     def post(self, request):
-        serializer = ChangeEmailSerializer(data=request.data)
+        serializer = ChangeEmailSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
 
         new_email = serializer.validated_data["new_email"]
