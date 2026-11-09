@@ -38,3 +38,8 @@ class DevicePushTokenSerializer(serializers.ModelSerializer):
             "id",
             "is_active",
         )
+        extra_kwargs = {
+            "expo_push_token": {
+                "validators": [],
+            },
+        }

@@ -40,8 +40,17 @@ class DevicePushTokenRegisterView(APIView):
     permission_classes = [IsUser]
 
     def post(self, request):
+        print("PUSH REGISTRATION REQUEST:", request.data)
+
         serializer = DevicePushTokenSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+
+        if not serializer.is_valid():
+            print("PUSH REGISTRATION ERRORS:", serializer.errors)
+
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         token = serializer.validated_data["expo_push_token"]
 
