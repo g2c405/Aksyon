@@ -2,7 +2,7 @@ from django.urls import path
 
 from .views import (
     AnalyticsDashboardView,
-    BarangayAnalyticsDashboardView,
+    DBSCANAnalyticsView,
 )
 
 
@@ -13,8 +13,8 @@ urlpatterns = [
         name="analytics-dashboard",
     ),
     path(
-        "dashboard/barangay/",
-        BarangayAnalyticsDashboardView.as_view(),
-        name="barangay-analytics-dashboard",
+        "dashboard/dbscan/",
+        DBSCANAnalyticsView.as_view(),
+        name="analytics-dbscan",
     ),
 ]
