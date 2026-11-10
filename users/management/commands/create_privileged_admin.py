@@ -1,3 +1,4 @@
+
 import os
 
 from django.core.management.base import BaseCommand
@@ -7,13 +8,31 @@ from django.contrib.auth import get_user_model
 class Command(BaseCommand):
     help = "Creates the built-in privileged admin account if it does not exist."
 
+    def add_arguments(self, parser):
+        # TEMPORARY: Allow specifying a separate database.
+        parser.add_argument(
+            "--database",
+            default="default",
+            help="Database alias to use.",
+        )
+
     def handle(self, *args, **options):
         User = get_user_model()
+
+        # TEMPORARY: Select the requested database.
+        db_alias = options["database"]
 
         username = os.environ["PRIVILEGED_ADMIN_USERNAME"]
         password = os.environ["PRIVILEGED_ADMIN_PASSWORD"]
 
-        user, created = User.objects.get_or_create(
+        # ORIGINAL:
+        # user, created = User.objects.get_or_create(
+        #     username=username,
+        #     defaults={...},
+        # )
+
+        # TEMPORARY:
+        user, created = User.objects.using(db_alias).get_or_create(
             username=username,
             defaults={
                 "first_name": "System",
@@ -28,7 +47,15 @@ class Command(BaseCommand):
 
         if created:
             user.set_password(password)
-            user.save(update_fields=["password"])
+
+            # ORIGINAL:
+            # user.save(update_fields=["password"])
+
+            # TEMPORARY:
+            user.save(
+                using=db_alias,
+                update_fields=["password"],
+            )
 
             self.stdout.write(
                 self.style.SUCCESS(
@@ -51,7 +78,13 @@ class Command(BaseCommand):
         dev_password = "DevAdmin123!"
         dev_email = "devadmin@example.com"
 
-        dev_user, dev_created = User.objects.get_or_create(
+        # ORIGINAL:
+        # dev_user, dev_created = User.objects.get_or_create(...)
+
+        # TEMPORARY:
+        dev_user, dev_created = User.objects.using(
+            db_alias
+        ).get_or_create(
             username=dev_username,
             defaults={
                 "first_name": "Dev",
@@ -67,7 +100,15 @@ class Command(BaseCommand):
 
         if dev_created:
             dev_user.set_password(dev_password)
-            dev_user.save(update_fields=["password"])
+
+            # ORIGINAL:
+            # dev_user.save(update_fields=["password"])
+
+            # TEMPORARY:
+            dev_user.save(
+                using=db_alias,
+                update_fields=["password"],
+            )
 
             self.stdout.write(
                 self.style.SUCCESS(
