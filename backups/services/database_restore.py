@@ -30,6 +30,7 @@ APPLICATION_APP_LABELS = {
     "analytics",
     "announcements",
     "emergency_units",
+    "audit_logs",
 }
 
 

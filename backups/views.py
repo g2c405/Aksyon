@@ -18,7 +18,7 @@ from backups.services.database_restore import (
     restore_database_backup,
 )
 
-
+from audit_logs.services import record_activity
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +28,19 @@ class DatabaseBackupView(APIView):
     def post(self, request):
         try:
             backup = create_database_backup()
+
+            record_activity(
+                actor=request.user,
+                action="DATABASE_BACKUP_CREATED",
+                target_type="DatabaseBackup",
+                target_id=backup["filename"],
+                description="Created a database backup.",
+                changes={
+                    "filename": backup["filename"],
+                    "size_bytes": backup["size_bytes"],
+                    "created_at": backup["created_at"],
+                },
+            )
 
             return Response(
                 {
@@ -59,6 +72,17 @@ class DatabaseRestoreView(APIView):
 
         try:
             result = restore_database_backup(filename)
+
+            record_activity(
+                actor=request.user,
+                action="DATABASE_BACKUP_RESTORED",
+                target_type="DatabaseBackup",
+                target_id=filename,
+                description=f"Restored database using backup {filename}.",
+                changes={
+                    "filename": filename,
+                },
+            )
 
             return Response(
                 result,

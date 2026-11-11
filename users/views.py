@@ -975,6 +975,22 @@ class AdminCreateView(CreateAPIView):
     permission_classes = [IsPrivilegedAdmin]
     serializer_class = AdminCreateSerializer
 
+    @transaction.atomic
+    def perform_create(self, serializer):
+        admin = serializer.save()
+
+        record_activity(
+            actor=self.request.user,
+            action="ADMIN_ACCOUNT_CREATED",
+            target_type="User",
+            target_id=admin.pk,
+            description=f"Created barangay admin account: {admin.username}.",
+            changes={
+                "username": admin.username,
+                "assigned_barangay": admin.assigned_barangay,
+            },
+        )
+
 
 class AdminListView(ListAPIView):
     queryset = User.objects.filter(
@@ -986,10 +1002,7 @@ class AdminListView(ListAPIView):
 
 
 class AdminRetrieveUpdateView(RetrieveUpdateAPIView):
-    queryset = User.objects.filter(
-        role=Role.ADMIN
-    )
-
+    queryset = User.objects.filter(role=Role.ADMIN)
     permission_classes = [IsPrivilegedAdmin]
 
     def get_serializer_class(self):
@@ -997,3 +1010,67 @@ class AdminRetrieveUpdateView(RetrieveUpdateAPIView):
             return AdminUpdateSerializer
 
         return AdminSerializer
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        admin = serializer.instance
+
+        old_values = {
+            "username": admin.username,
+            "first_name": admin.first_name,
+            "last_name": admin.last_name,
+            "email": admin.email,
+            "contact_number": admin.contact_number,
+            "assigned_barangay": admin.assigned_barangay,
+            "is_active": admin.is_active,
+        }
+
+        was_active = admin.is_active
+
+        admin = serializer.save()
+
+        new_values = {
+            "username": admin.username,
+            "first_name": admin.first_name,
+            "last_name": admin.last_name,
+            "email": admin.email,
+            "contact_number": admin.contact_number,
+            "assigned_barangay": admin.assigned_barangay,
+            "is_active": admin.is_active,
+        }
+
+        changes = {
+            field: {
+                "old": old_values[field],
+                "new": new_values[field],
+            }
+            for field in old_values
+            if old_values[field] != new_values[field]
+        }
+
+        if not changes:
+            return
+
+        if was_active and not admin.is_active:
+            action = "ADMIN_ACCOUNT_SUSPENDED"
+            description = f"Suspended barangay admin: {admin.username}."
+
+            changes["suspension_reason"] = admin.suspension_reason
+            changes["suspension_detail"] = admin.suspension_detail
+
+        elif not was_active and admin.is_active:
+            action = "ADMIN_ACCOUNT_REACTIVATED"
+            description = f"Reactivated barangay admin: {admin.username}."
+
+        else:
+            action = "ADMIN_ACCOUNT_UPDATED"
+            description = f"Updated barangay admin: {admin.username}."
+
+        record_activity(
+            actor=self.request.user,
+            action=action,
+            target_type="User",
+            target_id=admin.pk,
+            description=description,
+            changes=changes,
+        )
