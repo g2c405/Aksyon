@@ -394,8 +394,8 @@ def get_peak_incident_hours(queryset):
 
 def get_dbscan_clusters(
     queryset,
-    eps_km=0.5,
-    min_samples=2,
+    eps_km=0.2,
+    min_samples=3,
 ):
     """
     Generate geographic clusters from eligible reports.
