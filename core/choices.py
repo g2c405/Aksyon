@@ -144,3 +144,133 @@ class AccountSuspensionDetail(models.TextChoices):
         "Repeated violations of reporting guidelines",
     )
     OTHER_DETAIL = "other_detail", "Other"
+
+class AdminSuspensionReason(models.TextChoices):
+    MISUSE_OF_ADMINISTRATIVE_PRIVILEGES = (
+        "misuse_of_administrative_privileges",
+        "Misuse of administrative privileges",
+    )
+    NEGLIGENCE_OF_DUTIES = (
+        "negligence_of_duties",
+        "Negligence of duties",
+    )
+    DATA_PRIVACY_VIOLATION = (
+        "data_privacy_violation",
+        "Data privacy violation",
+    )
+    UNAUTHORIZED_SYSTEM_ACTIVITY = (
+        "unauthorized_system_activity",
+        "Unauthorized system activity",
+    )
+    FALSIFICATION_OF_RECORDS = (
+        "falsification_of_records",
+        "Falsification of records",
+    )
+    INAPPROPRIATE_CONDUCT = (
+        "inappropriate_conduct",
+        "Inappropriate conduct",
+    )
+    REPEATED_POLICY_VIOLATIONS = (
+        "repeated_policy_violations",
+        "Repeated policy violations",
+    )
+    OTHER = "other", "Other"
+
+
+class AdminSuspensionDetail(models.TextChoices):
+    # Misuse of administrative privileges
+    UNAUTHORIZED_ACCOUNT_SUSPENSION = (
+        "unauthorized_account_suspension",
+        "Unauthorized suspension of accounts",
+    )
+    UNAUTHORIZED_REPORT_MODIFICATION = (
+        "unauthorized_report_modification",
+        "Unauthorized modification of reports",
+    )
+    ABUSE_OF_ADMIN_ACCESS = (
+        "abuse_of_admin_access",
+        "Abuse of administrative access",
+    )
+
+    # Negligence of duties
+    FAILURE_TO_REVIEW_REPORTS = (
+        "failure_to_review_reports",
+        "Failure to review assigned reports",
+    )
+    FAILURE_TO_ACT_ON_REPORTS = (
+        "failure_to_act_on_reports",
+        "Repeated failure to act on assigned reports",
+    )
+    NEGLECT_OF_ADMINISTRATIVE_DUTIES = (
+        "neglect_of_administrative_duties",
+        "Prolonged neglect of administrative responsibilities",
+    )
+
+    # Data privacy violation
+    UNAUTHORIZED_DISCLOSURE = (
+        "unauthorized_disclosure",
+        "Unauthorized disclosure of resident information",
+    )
+    UNAUTHORIZED_RECORD_ACCESS = (
+        "unauthorized_record_access",
+        "Unauthorized access to private records",
+    )
+    IMPROPER_DATA_HANDLING = (
+        "improper_data_handling",
+        "Improper handling of personal data",
+    )
+
+    # Unauthorized system activity
+    UNAUTHORIZED_ACCOUNT_ACCESS = (
+        "unauthorized_account_access",
+        "Unauthorized account access",
+    )
+    UNAUTHORIZED_SYSTEM_CHANGES = (
+        "unauthorized_system_changes",
+        "Unauthorized changes to system settings",
+    )
+    CREDENTIAL_SHARING = (
+        "credential_sharing",
+        "Sharing administrative credentials",
+    )
+
+    # Falsification of records
+    ALTERATION_OF_REPORTS = (
+        "alteration_of_reports",
+        "Deliberate alteration of report information",
+    )
+    FALSIFICATION_OF_ADMINISTRATIVE_ACTIONS = (
+        "falsification_of_administrative_actions",
+        "Falsification of administrative actions",
+    )
+    CONCEALMENT_OF_RECORDS = (
+        "concealment_of_records",
+        "Concealing or manipulating administrative records",
+    )
+
+    # Inappropriate conduct
+    HARASSMENT_OR_THREATS = (
+        "harassment_or_threats",
+        "Harassment or threatening behavior",
+    )
+    ABUSIVE_COMMUNICATION = (
+        "abusive_communication",
+        "Abusive communication",
+    )
+    UNPROFESSIONAL_CONDUCT = (
+        "unprofessional_conduct",
+        "Unprofessional conduct",
+    )
+
+    # Repeated policy violations
+    REPEATED_ADMINISTRATIVE_VIOLATIONS = (
+        "repeated_administrative_violations",
+        "Repeated violations of administrative guidelines",
+    )
+    FAILURE_TO_FOLLOW_INSTRUCTIONS = (
+        "failure_to_follow_instructions",
+        "Failure to comply with official instructions",
+    )
+
+    # Other
+    OTHER_DETAIL = "other_detail", "Other"

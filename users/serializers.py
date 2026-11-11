@@ -19,6 +19,8 @@ from core.choices import (
     Role,
     AccountSuspensionReason,
     AccountSuspensionDetail,
+    AdminSuspensionReason,
+    AdminSuspensionDetail,
 )
 from notifications.models import Notification
 
@@ -53,7 +55,51 @@ SUSPENSION_DETAILS_BY_REASON = {
     },
 }
 
+ADMIN_SUSPENSION_DETAILS_BY_REASON = {
+    AdminSuspensionReason.MISUSE_OF_ADMINISTRATIVE_PRIVILEGES: {
+        AdminSuspensionDetail.UNAUTHORIZED_ACCOUNT_SUSPENSION,
+        AdminSuspensionDetail.UNAUTHORIZED_REPORT_MODIFICATION,
+        AdminSuspensionDetail.ABUSE_OF_ADMIN_ACCESS,
+    },
+    AdminSuspensionReason.NEGLIGENCE_OF_DUTIES: {
+        AdminSuspensionDetail.FAILURE_TO_REVIEW_REPORTS,
+        AdminSuspensionDetail.FAILURE_TO_ACT_ON_REPORTS,
+        AdminSuspensionDetail.NEGLECT_OF_ADMINISTRATIVE_DUTIES,
+    },
+    AdminSuspensionReason.DATA_PRIVACY_VIOLATION: {
+        AdminSuspensionDetail.UNAUTHORIZED_DISCLOSURE,
+        AdminSuspensionDetail.UNAUTHORIZED_RECORD_ACCESS,
+        AdminSuspensionDetail.IMPROPER_DATA_HANDLING,
+    },
+    AdminSuspensionReason.UNAUTHORIZED_SYSTEM_ACTIVITY: {
+        AdminSuspensionDetail.UNAUTHORIZED_ACCOUNT_ACCESS,
+        AdminSuspensionDetail.UNAUTHORIZED_SYSTEM_CHANGES,
+        AdminSuspensionDetail.CREDENTIAL_SHARING,
+    },
+    AdminSuspensionReason.FALSIFICATION_OF_RECORDS: {
+        AdminSuspensionDetail.ALTERATION_OF_REPORTS,
+        AdminSuspensionDetail.FALSIFICATION_OF_ADMINISTRATIVE_ACTIONS,
+        AdminSuspensionDetail.CONCEALMENT_OF_RECORDS,
+    },
+    AdminSuspensionReason.INAPPROPRIATE_CONDUCT: {
+        AdminSuspensionDetail.HARASSMENT_OR_THREATS,
+        AdminSuspensionDetail.ABUSIVE_COMMUNICATION,
+        AdminSuspensionDetail.UNPROFESSIONAL_CONDUCT,
+    },
+    AdminSuspensionReason.REPEATED_POLICY_VIOLATIONS: {
+        AdminSuspensionDetail.REPEATED_ADMINISTRATIVE_VIOLATIONS,
+        AdminSuspensionDetail.FAILURE_TO_FOLLOW_INSTRUCTIONS,
+    },
+    AdminSuspensionReason.OTHER: {
+        AdminSuspensionDetail.OTHER_DETAIL,
+    },
+}
+
 class AccountStatusUpdateMixin:
+
+    class AccountStatusUpdateMixin:
+        suspension_details_by_reason = SUSPENSION_DETAILS_BY_REASON
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
@@ -80,7 +126,7 @@ class AccountStatusUpdateMixin:
                     )
                 })
 
-            allowed_details = SUSPENSION_DETAILS_BY_REASON.get(reason, set())
+            allowed_details = self.suspension_details_by_reason.get(reason, set())
 
             if detail not in allowed_details:
                 raise serializers.ValidationError({
@@ -159,7 +205,8 @@ class AccountStatusUpdateMixin:
 
         return instance
 
-
+class AdminAccountStatusUpdateMixin(AccountStatusUpdateMixin):
+    suspension_details_by_reason = ADMIN_SUSPENSION_DETAILS_BY_REASON
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
@@ -418,7 +465,21 @@ class AdminSerializer(serializers.ModelSerializer):
             "date_joined",
         )
 
-class AdminUpdateSerializer(AccountStatusUpdateMixin, serializers.ModelSerializer):
+class AdminUpdateSerializer(
+    AdminAccountStatusUpdateMixin,
+    serializers.ModelSerializer,
+):
+    suspension_reason = serializers.ChoiceField(
+        choices=AdminSuspensionReason.choices,
+        required=False,
+        allow_blank=True,
+    )
+
+    suspension_detail = serializers.ChoiceField(
+        choices=AdminSuspensionDetail.choices,
+        required=False,
+        allow_blank=True,
+    )
 
     class Meta:
         model = User
