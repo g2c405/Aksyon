@@ -44,6 +44,7 @@ from .otp_services import (
     OTPResendCooldown,
 )
 from django.utils import timezone
+from audit_logs.services import record_activity
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -882,14 +883,92 @@ class AdminUserListView(ListAPIView):
         ).order_by("-date_joined")
 
 
+
 class AdminUserView(RetrieveUpdateAPIView):
-    queryset = User.objects.all()
     permission_classes = [IsAdmin]
 
-    def get_serializer_class(self):
-        if self.request.method in ["PUT", "PATCH"]:
-            return AdminUserUpdateSerializer
-        return AdminUserSerializer
+    def get_queryset(self):
+        return User.objects.filter(
+            residential_barangay=self.request.user.assigned_barangay
+        )
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        instance = serializer.instance
+
+        old_values = {
+            "is_active": instance.is_active,
+            "email": instance.email,
+            "suspension_reason": instance.suspension_reason,
+            "suspension_detail": instance.suspension_detail,
+            "suspension_notes": instance.suspension_notes,
+        }
+
+        user = serializer.save()
+
+        changes = {}
+
+        # Track account activation status.
+        if old_values["is_active"] != user.is_active:
+            changes["is_active"] = {
+                "from": old_values["is_active"],
+                "to": user.is_active,
+            }
+
+        # Track email changes.
+        if old_values["email"] != user.email:
+            changes["email"] = {
+                "from": old_values["email"],
+                "to": user.email,
+            }
+
+        # Track suspension-related changes.
+        for field in (
+            "suspension_reason",
+            "suspension_detail",
+            "suspension_notes",
+        ):
+            old_value = old_values[field]
+            new_value = getattr(user, field)
+
+            if old_value != new_value:
+                changes[field] = {
+                    "from": old_value,
+                    "to": new_value,
+                }
+
+        # Do not create logs for unchanged submissions.
+        if not changes:
+            return
+
+        # Determine the appropriate audit action.
+        if old_values["is_active"] and not user.is_active:
+            action = "RESIDENT_ACCOUNT_SUSPENDED"
+            description = (
+                f"Suspended resident account {user.username}"
+            )
+
+        elif not old_values["is_active"] and user.is_active:
+            action = "RESIDENT_ACCOUNT_REACTIVATED"
+            description = (
+                f"Reactivated resident account {user.username}"
+            )
+
+        else:
+            action = "RESIDENT_ACCOUNT_UPDATED"
+            description = (
+                f"Updated resident account {user.username}"
+            )
+
+        record_activity(
+            actor=self.request.user,
+            action=action,
+            target_type="User",
+            target_id=user.id,
+            description=description,
+            changes=changes,
+        )
+
 
 
 class AdminCreateView(CreateAPIView):

@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'emergency_units',
     'backups',
+    'audit_logs',
 ]
 
 AUTH_USER_MODEL = "users.User"

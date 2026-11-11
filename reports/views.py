@@ -41,7 +41,7 @@ from notifications.templates import (
 )
 
 from users.permissions import IsUser, IsAdmin
-
+from audit_logs.services import record_activity
 
 def create_status_notification(report):
     template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
@@ -188,37 +188,67 @@ class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
 
         return AdminPotentialDuplicateDetailSerializer
 
+    
     @transaction.atomic
     def perform_update(self, serializer):
-        old_status = serializer.instance.status
+        old_duplicate_status = serializer.instance.status
+
         duplicate = serializer.save()
 
-        # Only perform confirmation actions when the status actually changes.
-        if (
-            old_status == duplicate.status
-            or duplicate.status != DuplicateStatus.CONFIRMED
-        ):
+        # Only record actual status changes.
+        if old_duplicate_status == duplicate.status:
             return
 
         report = duplicate.report
-        now = timezone.now()
-        update_fields = []
+        old_report_status = report.status
 
-        # Resolve the report when its potential duplicate is confirmed.
-        if report.status != Status.RESOLVED:
-            report.status = Status.RESOLVED
-            update_fields.append("status")
+        # When a potential duplicate is confirmed, resolve its report.
+        if duplicate.status == DuplicateStatus.CONFIRMED:
+            now = timezone.now()
+            update_fields = []
 
-        # Preserve an existing resolution timestamp.
-        if report.resolved_at is None:
-            report.resolved_at = now
-            update_fields.append("resolved_at")
+            if report.status != Status.RESOLVED:
+                report.status = Status.RESOLVED
+                update_fields.append("status")
 
-        if update_fields:
-            report.save(update_fields=update_fields)
+            # Preserve an existing resolution timestamp.
+            if report.resolved_at is None:
+                report.resolved_at = now
+                update_fields.append("resolved_at")
 
-        # Notify the report owner that the report has been resolved.
-        create_status_notification(report)
+            if update_fields:
+                report.save(update_fields=update_fields)
+
+            # Notify the report owner that the report has been resolved.
+            create_status_notification(report)
+
+        # Record the potential duplicate status change.
+        changes = {
+            "status": {
+                "from": str(old_duplicate_status),
+                "to": str(duplicate.status),
+            }
+        }
+
+        # Include the associated report status if confirmation changed it.
+        if old_report_status != report.status:
+            changes["report_status"] = {
+                "from": str(old_report_status),
+                "to": str(report.status),
+            }
+
+        record_activity(
+            actor=self.request.user,
+            action="POTENTIAL_DUPLICATE_STATUS_UPDATED",
+            target_type="PotentialDuplicate",
+            target_id=duplicate.id,
+            description=(
+                f"Updated potential duplicate #{duplicate.id} "
+                f"for report #{report.id}"
+            ),
+            changes=changes,
+        )
+
 
 
 class AdminReportView(RetrieveUpdateAPIView):
@@ -236,9 +266,10 @@ class AdminReportView(RetrieveUpdateAPIView):
         return AdminReportDetailSerializer
 
     @transaction.atomic
-    @transaction.atomic
     def perform_update(self, serializer):
         old_status = serializer.instance.status
+        old_dismissal_reason = serializer.instance.dismissal_reason
+
         report = serializer.save()
         now = timezone.now()
         update_fields = []
@@ -308,6 +339,39 @@ class AdminReportView(RetrieveUpdateAPIView):
 
         if update_fields:
             report.save(update_fields=update_fields)
+
+        # Record the admin's action only when an auditable field changed.
+        changes = {}
+
+        if old_status != report.status:
+            changes["status"] = {
+                "from": str(old_status),
+                "to": str(report.status),
+            }
+
+        if old_dismissal_reason != report.dismissal_reason:
+            changes["dismissal_reason"] = {
+                "from": (
+                    str(old_dismissal_reason)
+                    if old_dismissal_reason is not None
+                    else None
+                ),
+                "to": (
+                    str(report.dismissal_reason)
+                    if report.dismissal_reason is not None
+                    else None
+                ),
+            }
+
+        if changes:
+            record_activity(
+                actor=self.request.user,
+                action="REPORT_STATUS_UPDATED",
+                target_type="Report",
+                target_id=report.id,
+                description=f"Updated report #{report.id}",
+                changes=changes,
+            )
 
 class AdminReportVideoURLView(APIView):
     permission_classes = [IsAdmin]

@@ -20,6 +20,8 @@ from .services.storage import create_signed_read_url, create_upload_url
 from .utils import get_media_type
 from notifications.models import Notification
 from notifications.templates import ANNOUNCEMENT_NOTIFICATION_TEMPLATE
+from django.db import transaction
+from audit_logs.services import record_activity
 class AnnouncementListView(ListAPIView):
     permission_classes = [IsUser]
     serializer_class = AnnouncementListSerializer
@@ -91,6 +93,7 @@ class AnnouncementViewSet(ModelViewSet):
 
         return AnnouncementSerializer
 
+    @transaction.atomic
     def perform_create(self, serializer):
         announcement = serializer.save(
             admin=self.request.user,
@@ -107,6 +110,73 @@ class AnnouncementViewSet(ModelViewSet):
                 announcement=announcement,
                 **ANNOUNCEMENT_NOTIFICATION_TEMPLATE,
             )
+
+        record_activity(
+            actor=self.request.user,
+            action="ANNOUNCEMENT_CREATED",
+            target_type="Announcement",
+            target_id=announcement.id,
+            description=f"Created announcement: {announcement.title}",
+            changes={
+                "title": announcement.title,
+                "barangay": announcement.barangay,
+            },
+        )
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        announcement = serializer.instance
+
+        old_values = {
+            "title": announcement.title,
+            "content": announcement.content,
+            "media": announcement.media,
+        }
+
+        announcement = serializer.save()
+
+        changes = {}
+
+        for field, old_value in old_values.items():
+            new_value = getattr(announcement, field)
+
+            if old_value != new_value:
+                changes[field] = {
+                    "from": old_value,
+                    "to": new_value,
+                }
+
+        if not changes:
+            return
+
+        record_activity(
+            actor=self.request.user,
+            action="ANNOUNCEMENT_UPDATED",
+            target_type="Announcement",
+            target_id=announcement.id,
+            description=f"Updated announcement: {announcement.title}",
+            changes=changes,
+        )
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        announcement_id = instance.id
+        announcement_title = instance.title
+
+        record_activity(
+            actor=self.request.user,
+            action="ANNOUNCEMENT_DELETED",
+            target_type="Announcement",
+            target_id=announcement_id,
+            description=f"Deleted announcement: {announcement_title}",
+            changes={
+                "title": announcement_title,
+                "barangay": instance.barangay,
+            },
+        )
+
+        instance.delete()
+
     @action(
         detail=True,
         methods=["get"],
