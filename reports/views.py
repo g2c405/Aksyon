@@ -43,6 +43,8 @@ from notifications.templates import (
 from users.permissions import IsUser, IsAdmin
 from audit_logs.services import record_activity
 
+from rest_framework.exceptions import ValidationError
+
 def create_status_notification(report):
     template = STATUS_NOTIFICATION_TEMPLATES.get(report.status)
 
@@ -54,6 +56,34 @@ def create_status_notification(report):
         report=report,
         **template,
     )
+
+
+def validate_report_status_transition(current_status, new_status):
+    if current_status == new_status:
+        return
+
+    allowed_transitions = {
+        Status.PENDING: {
+            Status.ONGOING,
+            Status.DISMISSED,
+        },
+        Status.ONGOING: {
+            Status.RESOLVED,
+            Status.DISMISSED,
+        },
+        Status.RESOLVED: set(),
+        Status.DISMISSED: set(),
+    }
+
+    if new_status not in allowed_transitions.get(current_status, set()):
+        raise ValidationError({
+            "status": (
+                f"Invalid status transition: {current_status} "
+                f"to {new_status}."
+            )
+        })
+
+
 
 class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
@@ -189,20 +219,40 @@ class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
         return AdminPotentialDuplicateDetailSerializer
 
     
+    
     @transaction.atomic
     def perform_update(self, serializer):
-        old_duplicate_status = serializer.instance.status
+        duplicate = serializer.instance
+        old_duplicate_status = duplicate.status
+
+        new_duplicate_status = serializer.validated_data.get(
+            "status",
+            old_duplicate_status,
+        )
+
+        report = duplicate.report
+
+        # A dismissed report cannot be confirmed as a duplicate,
+        # because doing so would effectively reverse its dismissal.
+        if (
+            old_duplicate_status != new_duplicate_status
+            and new_duplicate_status == DuplicateStatus.CONFIRMED
+            and report.status == Status.DISMISSED
+        ):
+            raise ValidationError({
+                "status": (
+                    "A dismissed report cannot be confirmed as a duplicate."
+                )
+            })
 
         duplicate = serializer.save()
 
-        # Only record actual status changes.
+        # Only process actual duplicate status changes.
         if old_duplicate_status == duplicate.status:
             return
 
-        report = duplicate.report
         old_report_status = report.status
 
-        # When a potential duplicate is confirmed, resolve its report.
         if duplicate.status == DuplicateStatus.CONFIRMED:
             now = timezone.now()
             update_fields = []
@@ -211,18 +261,31 @@ class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
                 report.status = Status.RESOLVED
                 update_fields.append("status")
 
-            # Preserve an existing resolution timestamp.
-            if report.resolved_at is None:
-                report.resolved_at = now
-                update_fields.append("resolved_at")
+                # For a direct Pending -> Resolved transition,
+                # both timestamps use the same time.
+                if report.ongoing_at is None:
+                    report.ongoing_at = now
+                    update_fields.append("ongoing_at")
+
+                if report.resolved_at is None:
+                    report.resolved_at = now
+                    update_fields.append("resolved_at")
+
+            else:
+                # Repair missing timestamps without overwriting existing ones.
+                if report.resolved_at is None:
+                    report.resolved_at = now
+                    update_fields.append("resolved_at")
+
+                if report.ongoing_at is None:
+                    report.ongoing_at = report.resolved_at
+                    update_fields.append("ongoing_at")
 
             if update_fields:
                 report.save(update_fields=update_fields)
 
-            # Notify the report owner that the report has been resolved.
             create_status_notification(report)
 
-        # Record the potential duplicate status change.
         changes = {
             "status": {
                 "from": str(old_duplicate_status),
@@ -230,7 +293,6 @@ class AdminPotentialDuplicateView(RetrieveUpdateAPIView):
             }
         }
 
-        # Include the associated report status if confirmation changed it.
         if old_report_status != report.status:
             changes["report_status"] = {
                 "from": str(old_report_status),
@@ -265,28 +327,43 @@ class AdminReportView(RetrieveUpdateAPIView):
 
         return AdminReportDetailSerializer
 
+    
     @transaction.atomic
     def perform_update(self, serializer):
-        old_status = serializer.instance.status
-        old_dismissal_reason = serializer.instance.dismissal_reason
+        report = serializer.instance
+
+        old_status = report.status
+        old_dismissal_reason = report.dismissal_reason
+
+        new_status = serializer.validated_data.get(
+            "status",
+            old_status,
+        )
+
+        # Reject invalid status transitions before saving.
+        validate_report_status_transition(
+            old_status,
+            new_status,
+        )
 
         report = serializer.save()
+
         now = timezone.now()
         update_fields = []
 
-        # A dismissal reason only applies while the report is dismissed.
-        # Clear stale reasons when an admin moves the report to another status.
+        # A dismissal reason only applies while dismissed.
         if report.status != Status.DISMISSED and report.dismissal_reason:
             report.dismissal_reason = None
             update_fields.append("dismissal_reason")
 
-        # Clear dismissed_at if the report leaves the dismissed state.
+        # Clear dismissed_at when the report is no longer dismissed.
         if report.status != Status.DISMISSED and report.dismissed_at:
             report.dismissed_at = None
             update_fields.append("dismissed_at")
 
         if old_status != report.status:
-            # Record when the report first enters the ongoing state.
+
+            # Record when the report enters ongoing.
             if (
                 report.status == Status.ONGOING
                 and report.ongoing_at is None
@@ -310,8 +387,8 @@ class AdminReportView(RetrieveUpdateAPIView):
                 report.dismissed_at = now
                 update_fields.append("dismissed_at")
 
-            # Automatically dismiss unresolved potential-duplicate flags when
-            # the report is moved to ongoing or resolved.
+            # Dismiss unresolved potential duplicate flags when
+            # the report progresses to ongoing or resolved.
             if report.status in (Status.ONGOING, Status.RESOLVED):
                 PotentialDuplicate.objects.filter(
                     report=report,
@@ -323,10 +400,10 @@ class AdminReportView(RetrieveUpdateAPIView):
                 ).update(status=DuplicateStatus.DISMISSED)
 
             if report.status == Status.DISMISSED:
-                # Send a user warning specific to the selected dismissal reason.
                 template = DISMISSAL_NOTIFICATION_TEMPLATES.get(
                     report.dismissal_reason
                 )
+
                 if template:
                     create_notification(
                         user=report.user,
@@ -334,13 +411,12 @@ class AdminReportView(RetrieveUpdateAPIView):
                         **template,
                     )
             else:
-                # Preserve the existing status-update notification behavior.
                 create_status_notification(report)
 
         if update_fields:
             report.save(update_fields=update_fields)
 
-        # Record the admin's action only when an auditable field changed.
+        # Audit actual status and dismissal reason changes.
         changes = {}
 
         if old_status != report.status:
@@ -372,6 +448,7 @@ class AdminReportView(RetrieveUpdateAPIView):
                 description=f"Updated report #{report.id}",
                 changes=changes,
             )
+
 
 class AdminReportVideoURLView(APIView):
     permission_classes = [IsAdmin]
