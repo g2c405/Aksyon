@@ -95,10 +95,9 @@ ADMIN_SUSPENSION_DETAILS_BY_REASON = {
     },
 }
 
-class AccountStatusUpdateMixin:
 
-    class AccountStatusUpdateMixin:
-        suspension_details_by_reason = SUSPENSION_DETAILS_BY_REASON
+class AccountStatusUpdateMixin:
+    suspension_details_by_reason = SUSPENSION_DETAILS_BY_REASON
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -106,42 +105,60 @@ class AccountStatusUpdateMixin:
         instance = self.instance
         new_is_active = attrs.get("is_active", instance.is_active)
 
-        # Only require a reason when an active account is being disabled.
         if instance.is_active and new_is_active is False:
             reason = attrs.get("suspension_reason")
-            detail = attrs.get("suspension_detail")
+            detail = attrs.get("suspension_detail", "").strip()
             notes = attrs.get("suspension_notes", "").strip()
 
             if not reason:
                 raise serializers.ValidationError({
-                    "suspension_reason": (
-                        "A suspension reason is required."
-                    )
+                    "suspension_reason": "A suspension reason is required."
                 })
 
-            if not detail:
-                raise serializers.ValidationError({
-                    "suspension_detail": (
-                        "A specific suspension reason is required."
-                    )
-                })
+            if reason == "other":
+                if detail:
+                    raise serializers.ValidationError({
+                        "suspension_detail": (
+                            "Suspension detail must be empty when "
+                            "the suspension reason is Other."
+                        )
+                    })
 
-            allowed_details = self.suspension_details_by_reason.get(reason, set())
+                if not notes:
+                    raise serializers.ValidationError({
+                        "suspension_notes": (
+                            "Please provide an explanation when "
+                            "selecting Other."
+                        )
+                    })
 
-            if detail not in allowed_details:
-                raise serializers.ValidationError({
-                    "suspension_detail": (
-                        "This specific reason does not belong "
-                        "to the selected primary reason."
-                    )
-                })
+            else:
+                if not detail:
+                    raise serializers.ValidationError({
+                        "suspension_detail": (
+                            "A specific suspension detail is required."
+                        )
+                    })
 
-            if detail == AccountSuspensionDetail.OTHER_DETAIL and not notes:
-                raise serializers.ValidationError({
-                    "suspension_notes": (
-                        "Please explain the reason when selecting Other."
-                    )
-                })
+                if notes:
+                    raise serializers.ValidationError({
+                        "suspension_notes": (
+                            "Suspension notes must be empty unless "
+                            "the suspension reason is Other."
+                        )
+                    })
+
+                allowed_details = self.suspension_details_by_reason.get(
+                    reason, set()
+                )
+
+                if detail not in allowed_details:
+                    raise serializers.ValidationError({
+                        "suspension_detail": (
+                            "This detail does not belong to the "
+                            "selected suspension reason."
+                        )
+                    })
 
         return attrs
 
@@ -150,7 +167,6 @@ class AccountStatusUpdateMixin:
         was_active = instance.is_active
         will_be_active = validated_data.get("is_active", was_active)
 
-        # Ignore suspension fields when the account is not being disabled.
         if not was_active or will_be_active is not False:
             validated_data.pop("suspension_reason", None)
             validated_data.pop("suspension_detail", None)
@@ -169,21 +185,20 @@ class AccountStatusUpdateMixin:
         instance = super().update(instance, validated_data)
 
         if was_active and not instance.is_active:
-            # Invalidate the user's DRF token.
             Token.objects.filter(user=instance).delete()
 
             reason_label = instance.get_suspension_reason_display()
-            detail_label = instance.get_suspension_detail_display()
-            notes = instance.suspension_notes.strip()
+            detail_label = (
+                instance.suspension_notes.strip()
+                if instance.suspension_reason == "other"
+                else instance.get_suspension_detail_display()
+            )
 
             message = (
                 f"Your Aksyon account has been disabled. "
                 f"Reason: {reason_label}. "
                 f"Details: {detail_label}."
             )
-
-            if notes:
-                message += f" Explanation: {notes}"
 
             Notification.objects.create(
                 user=instance,
@@ -204,6 +219,7 @@ class AccountStatusUpdateMixin:
             )
 
         return instance
+
 
 class AdminAccountStatusUpdateMixin(AccountStatusUpdateMixin):
     suspension_details_by_reason = ADMIN_SUSPENSION_DETAILS_BY_REASON

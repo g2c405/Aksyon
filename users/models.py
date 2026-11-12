@@ -17,6 +17,7 @@ class User(AbstractUser):
         max_length=11,
         blank=True,
         null=True,
+        unique=True,
         validators=[
             RegexValidator(
                 regex=r"^\d{11}$",

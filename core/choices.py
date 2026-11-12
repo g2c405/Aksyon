@@ -143,7 +143,6 @@ class AccountSuspensionDetail(models.TextChoices):
         "repeated_guideline_violations",
         "Repeated violations of reporting guidelines",
     )
-    OTHER_DETAIL = "other_detail", "Other"
 
 class AdminSuspensionReason(models.TextChoices):
     MISUSE_OF_ADMINISTRATIVE_PRIVILEGES = (
@@ -273,4 +272,3 @@ class AdminSuspensionDetail(models.TextChoices):
     )
 
     # Other
-    OTHER_DETAIL = "other_detail", "Other"
