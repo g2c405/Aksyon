@@ -45,6 +45,7 @@ from .otp_services import (
 )
 from django.utils import timezone
 from audit_logs.services import record_activity
+from django.db import IntegrityError
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -618,17 +619,16 @@ class VerifyContactNumberChangeView(APIView):
             )
 
         request.user.contact_number = new_contact_number
-        request.user.save(update_fields=["contact_number"])
+        try:
+            with transaction.atomic():
+                request.user.contact_number = new_contact_number
+                request.user.save(update_fields=["contact_number"])
 
-        create_account_change_notification(
-            request.user,
-            "contact_changed",
-        )
-
-        return Response(
-            {"detail": "Contact number successfully updated."},
-            status=status.HTTP_200_OK,
-        )
+        except IntegrityError:
+            return Response(
+                {"detail": "This contact number is already in use."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 class ResendContactNumberChangeOTPView(APIView):
     permission_classes = [IsUser | IsPrivilegedAdmin]

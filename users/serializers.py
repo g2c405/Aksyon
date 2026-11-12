@@ -429,6 +429,23 @@ class AdminUserUpdateSerializer(
     AccountStatusUpdateMixin,
     serializers.ModelSerializer,
 ):
+    suspension_reason = serializers.ChoiceField(
+        choices=AccountSuspensionReason.choices,
+        required=False,
+        allow_blank=True,
+    )
+
+    suspension_detail = serializers.ChoiceField(
+        choices=AccountSuspensionDetail.choices,
+        required=False,
+        allow_blank=True,
+    )
+
+    suspension_notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+    )
+
     class Meta:
         model = User
         fields = (
