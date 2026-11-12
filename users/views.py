@@ -892,8 +892,15 @@ class AdminUserView(RetrieveUpdateAPIView):
             residential_barangay=self.request.user.assigned_barangay
         )
 
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return AdminUserUpdateSerializer
+
+        return AdminUserSerializer
+
     @transaction.atomic
     def perform_update(self, serializer):
+        # Keep your existing implementation here.
         instance = serializer.instance
 
         old_values = {
