@@ -31,29 +31,23 @@ SUSPENSION_DETAILS_BY_REASON = {
         AccountSuspensionDetail.INAPPROPRIATE_USERNAME,
         AccountSuspensionDetail.INAPPROPRIATE_PROFILE_INFORMATION,
         AccountSuspensionDetail.FALSE_CONTACT_INFORMATION,
-        AccountSuspensionDetail.OTHER_DETAIL,
     },
     AccountSuspensionReason.REPORTING_SYSTEM_ABUSE: {
         AccountSuspensionDetail.FALSE_REPORTS,
         AccountSuspensionDetail.MISLEADING_DESCRIPTIONS,
         AccountSuspensionDetail.SPAM_OR_DUPLICATE_REPORTS,
         AccountSuspensionDetail.REPORT_LOCATION_MISUSE,
-        AccountSuspensionDetail.OTHER_DETAIL,
     },
     AccountSuspensionReason.INAPPROPRIATE_CONTENT: {
         AccountSuspensionDetail.PROFANITY_OR_ABUSE,
         AccountSuspensionDetail.INAPPROPRIATE_MEDIA,
         AccountSuspensionDetail.HARASSMENT_OR_THREATS,
-        AccountSuspensionDetail.OTHER_DETAIL,
     },
     AccountSuspensionReason.REPEATED_POLICY_VIOLATIONS: {
         AccountSuspensionDetail.REPEATED_GUIDELINE_VIOLATIONS,
-        AccountSuspensionDetail.OTHER_DETAIL,
-    },
-    AccountSuspensionReason.OTHER: {
-        AccountSuspensionDetail.OTHER_DETAIL,
     },
 }
+
 
 ADMIN_SUSPENSION_DETAILS_BY_REASON = {
     AdminSuspensionReason.MISUSE_OF_ADMINISTRATIVE_PRIVILEGES: {
@@ -89,9 +83,6 @@ ADMIN_SUSPENSION_DETAILS_BY_REASON = {
     AdminSuspensionReason.REPEATED_POLICY_VIOLATIONS: {
         AdminSuspensionDetail.REPEATED_ADMINISTRATIVE_VIOLATIONS,
         AdminSuspensionDetail.FAILURE_TO_FOLLOW_INSTRUCTIONS,
-    },
-    AdminSuspensionReason.OTHER: {
-        AdminSuspensionDetail.OTHER_DETAIL,
     },
 }
 
