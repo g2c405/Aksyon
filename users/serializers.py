@@ -355,6 +355,34 @@ class ChangeContactNumberSerializer(serializers.Serializer):
 
         return value
 
+class ChangeBarangaySerializer(serializers.Serializer):
+    new_residential_barangay = serializers.ChoiceField(
+        choices=User._meta.get_field(
+            "residential_barangay"
+        ).choices,
+        required=True,
+    )
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+
+        if user.role != Role.USER:
+            raise serializers.ValidationError({
+                "detail": "Only residents can change their barangay."
+            })
+
+        new_barangay = attrs["new_residential_barangay"]
+
+        if new_barangay == user.residential_barangay:
+            raise serializers.ValidationError({
+                "new_residential_barangay": (
+                    "You are already registered in this barangay."
+                )
+            })
+
+        return attrs
+
+
 class AdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
 

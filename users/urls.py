@@ -20,7 +20,8 @@ from .views import (
     VerifyContactNumberChangeView,
     ResendRegistrationOTPView,
     ResendEmailChangeOTPView,
-    ResendContactNumberChangeOTPView
+    ResendContactNumberChangeOTPView,
+    ChangeBarangayView
 )
 from rest_framework.authtoken.views import obtain_auth_token
 urlpatterns = [
@@ -84,5 +85,10 @@ urlpatterns = [
         "resend-contact-number-change-otp/",
         ResendContactNumberChangeOTPView.as_view(),
         name="resend-contact-number-change-otp",
+    ),
+    path(
+        "change-barangay/",
+        ChangeBarangayView.as_view(),
+        name="change-barangay",
     ),
 ]

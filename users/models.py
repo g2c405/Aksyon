@@ -76,6 +76,11 @@ class User(AbstractUser):
 
     email_verified = models.BooleanField(default=False)
 
+    residential_barangay_changed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

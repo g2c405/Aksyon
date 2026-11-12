@@ -46,6 +46,7 @@ from .otp_services import (
 from django.utils import timezone
 from audit_logs.services import record_activity
 from django.db import IntegrityError
+from .serializers import ChangeBarangaySerializer
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -80,6 +81,17 @@ def create_account_change_notification(user, event):
                 "your account immediately."
             ),
         },
+
+        "barangay_changed": {
+            "title": "Residential Barangay Changed",
+            "message": (
+                "Your residential barangay was successfully changed. "
+                "You can only change your residential barangay again "
+                "after three months. "
+                "If you didn't make this change, please secure "
+                "your account immediately."
+            ),
+        },
     }
 
     content = notification_content[event]
@@ -89,6 +101,24 @@ def create_account_change_notification(user, event):
         notification_type="user_warning",
         title=content["title"],
         message=content["message"],
+    )
+
+import calendar
+
+def add_three_months(value):
+    month = value.month + 3
+    year = value.year + (month - 1) // 12
+    month = (month - 1) % 12 + 1
+
+    day = min(
+        value.day,
+        calendar.monthrange(year, month)[1]
+    )
+
+    return value.replace(
+        year=year,
+        month=month,
+        day=day,
     )
 
 
@@ -678,6 +708,75 @@ class ResendContactNumberChangeOTPView(APIView):
             {"detail": "A new verification code has been sent."},
             status=status.HTTP_200_OK,
         )
+
+class ChangeBarangayView(APIView):
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        serializer = ChangeBarangaySerializer(
+            data=request.data,
+            context={"request": request},
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        now = timezone.now()
+
+        last_changed = user.residential_barangay_changed_at
+
+        if last_changed:
+            next_change_allowed = add_three_months(
+                last_changed
+            )
+
+            if now < next_change_allowed:
+                return Response(
+                    {
+                        "detail": (
+                            "You can only change your residential "
+                            "barangay once every three months."
+                        ),
+                        "next_change_allowed": (
+                            next_change_allowed.isoformat()
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        new_barangay = serializer.validated_data[
+            "new_residential_barangay"
+        ]
+
+        with transaction.atomic():
+            user.residential_barangay = new_barangay
+            user.residential_barangay_changed_at = now
+
+            user.save(
+                update_fields=[
+                    "residential_barangay",
+                    "residential_barangay_changed_at",
+                ]
+            )
+
+            create_account_change_notification(
+                user,
+                "barangay_changed",
+            )
+
+        return Response(
+            {
+                "detail": (
+                    "Residential barangay successfully changed."
+                ),
+                "residential_barangay": user.residential_barangay,
+                "next_change_allowed": (
+                    add_three_months(now).isoformat()
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 
 class ResetPasswordView(APIView):
