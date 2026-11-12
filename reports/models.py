@@ -67,6 +67,7 @@ class PotentialDuplicate(models.Model):
     distance_meters = models.FloatField()
     time_difference_seconds = models.FloatField()
     barangay_match = models.BooleanField()
+    category_match = models.BooleanField(default=False)
     description_similarity = models.FloatField()
     similarity_score = models.FloatField()
 

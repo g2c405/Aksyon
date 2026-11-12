@@ -8,9 +8,10 @@ from core.geo import haversine
 MAX_TIME_DIFFERENCE = timedelta(minutes=10)
 MAX_DISTANCE_KM = 0.3
 
-DISTANCE_WEIGHT = 0.40
-TIME_WEIGHT = 0.35
-JACCARD_WEIGHT = 0.25
+DISTANCE_WEIGHT = 0.35
+TIME_WEIGHT = 0.25
+JACCARD_WEIGHT = 0.20
+CATEGORY_WEIGHT = 0.20
 
 POTENTIAL_DUPLICATE_THRESHOLD = 0.70
 
@@ -54,6 +55,9 @@ def calculate_candidate_similarity(report, candidate): #we compare txt similarit
         candidate.description,
     ) #if 3 words in common, but only 2 words unique, this returns 1.5
 
+def calculate_category_score(report, candidate):
+    return 1.0 if report.category == candidate.category else 0.0
+
 
 def calculate_distance_score(distance_km):
     if distance_km >= MAX_DISTANCE_KM:  #score becomes 0 if their distance is greater than the maximum coverage
@@ -76,13 +80,14 @@ def calculate_overall_score(
     distance_score,
     time_score,
     jaccard_score,
+    category_score,
 ):
     return (
-        distance_score * DISTANCE_WEIGHT #0.33 * 0.40 = 0.132
-        + time_score * TIME_WEIGHT #0.3 * 0.35 = 0.105
-        + jaccard_score * JACCARD_WEIGHT #1.5 * 0.25 = 0.375
-    ) # total = 0.61, threshold is 0.70
-
+        distance_score * DISTANCE_WEIGHT
+        + time_score * TIME_WEIGHT
+        + jaccard_score * JACCARD_WEIGHT
+        + category_score * CATEGORY_WEIGHT
+    )
 
 def is_potential_duplicate(overall_score):
     return overall_score >= POTENTIAL_DUPLICATE_THRESHOLD #0.61 = NOT potential duplicate
@@ -104,6 +109,11 @@ def detect_potential_duplicates(report): #report = newly created report
             time_difference
         )
 
+        category_score = calculate_category_score(
+            report,
+            candidate,
+        )
+
         jaccard_score = calculate_candidate_similarity(
             report,
             candidate,
@@ -113,16 +123,17 @@ def detect_potential_duplicates(report): #report = newly created report
             distance_score,
             time_score,
             jaccard_score,
+            category_score,
         )
-
         if is_potential_duplicate(overall_score):
             potential_duplicates.append({
-                "report": candidate, #the older report
+                "report": candidate,
                 "distance": distance,
                 "time_difference": time_difference,
                 "distance_score": distance_score,
                 "time_score": time_score,
                 "jaccard_score": jaccard_score,
+                "category_score": category_score,
                 "overall_score": overall_score,
             })
 
@@ -143,6 +154,7 @@ def save_potential_duplicates(report): #the newly created report
                 "barangay_match": (
                     report.barangay == result["report"].barangay
                 ),
+                "category_match": result["category_score"] == 1.0,
                 "description_similarity": result["jaccard_score"],
                 "similarity_score": result["overall_score"],
             },
