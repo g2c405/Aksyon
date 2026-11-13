@@ -53,7 +53,8 @@ from .serializers import ChangeBarangaySerializer
 
 from django.core import signing
 from .otp_services import OTP_EXPIRY_MINUTES
-
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 
 def create_account_change_notification(user, event):
     notification_content = {
@@ -948,128 +949,213 @@ class ResetPasswordView(APIView):
         )
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class PasswordResetPageView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    def get(self, request, user_id, token):
+    TEMPLATE = "users/password_reset.html"
+
+    def get_session_key(self, user):
+        return f"password_reset_verified_{user.pk}"
+
+    def render_page(
+        self,
+        request,
+        *,
+        phase="otp",
+        message=None,
+        invalid_link=False,
+        success=False,
+        status_code=200,
+    ):
+        return render(
+            request,
+            self.TEMPLATE,
+            {
+                "phase": phase,
+                "message": message,
+                "invalid_link": invalid_link,
+                "success": success,
+            },
+            status=status_code,
+        )
+
+    def get_valid_user(self, user_id, token):
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return render(
-                request,
-                "users/password_reset.html",
-                {
-                    "success": False,
-                    "invalid_link": True,
-                    "message": "This password reset link is invalid.",
-                },
-                status=400,
-            )
+            return None
 
         if not default_token_generator.check_token(user, token):
-            return render(
+            return None
+
+        return user
+
+    def get(self, request, user_id, token):
+        user = self.get_valid_user(user_id, token)
+
+        if not user:
+            return self.render_page(
                 request,
-                "users/password_reset.html",
-                {
-                    "success": False,
-                    "invalid_link": True,
-                    "message": (
-                        "This password reset link is invalid "
-                        "or has expired. Please request a new one."
-                    ),
-                },
-                status=400,
+                invalid_link=True,
+                message=(
+                    "This password reset link is invalid or has expired. "
+                    "Please request a new one."
+                ),
+                status_code=400,
             )
 
-        return render(
+        # If OTP verification already succeeded in this session,
+        # refreshing the page should retain the password phase.
+        verified = (
+            request.session.get(self.get_session_key(user)) == token
+        )
+
+        return self.render_page(
             request,
-            "users/password_reset.html",
-            {
-                "success": False,
-                "invalid_link": False,
-            },
+            phase="password" if verified else "otp",
         )
 
     def post(self, request, user_id, token):
-        try:
-            user = User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            return render(
+        user = self.get_valid_user(user_id, token)
+
+        if not user:
+            return self.render_page(
                 request,
-                "users/password_reset.html",
-                {
-                    "success": False,
-                    "invalid_link": True,
-                    "message": "This password reset link is invalid.",
-                },
-                status=400,
+                invalid_link=True,
+                message=(
+                    "This password reset link is invalid or has expired. "
+                    "Please request a new one."
+                ),
+                status_code=400,
             )
 
-        if not default_token_generator.check_token(user, token):
-            return render(
-                request,
-                "users/password_reset.html",
-                {
-                    "success": False,
-                    "invalid_link": True,
-                    "message": (
-                        "This password reset link is invalid "
-                        "or has expired. Please request a new one."
+        action = request.POST.get("action")
+        session_key = self.get_session_key(user)
+
+        # PHASE 1: Verify OTP
+        if action == "verify_otp":
+            code = request.POST.get("code", "").strip()
+
+            if not code:
+                return self.render_page(
+                    request,
+                    phase="otp",
+                    message="Please enter your six-digit verification code.",
+                    status_code=400,
+                )
+
+            try:
+                verify_user_otp(
+                    user,
+                    purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                    submitted_code=code,
+                )
+
+            except (
+                OTPNotFound,
+                OTPExpired,
+                OTPInvalid,
+                OTPMaxAttempts,
+            ):
+                return self.render_page(
+                    request,
+                    phase="otp",
+                    message=(
+                        "The verification code is invalid or has expired. "
+                        "Please check your code or request a new one."
                     ),
-                },
-                status=400,
+                    status_code=400,
+                )
+
+            # Keep successful verification in this browser session.
+            request.session[session_key] = token
+            request.session.set_expiry(OTP_EXPIRY_MINUTES * 60)
+
+            return self.render_page(
+                request,
+                phase="password",
             )
 
-        new_password = request.POST.get("new_password", "")
-        confirm_password = request.POST.get("confirm_password", "")
+        # PHASE 2: Set new password
+        if action == "reset_password":
+            verified_token = request.session.get(session_key)
 
-        if not new_password or not confirm_password:
-            message = "Please fill in both password fields."
-        elif new_password != confirm_password:
-            message = "The passwords do not match."
-        else:
+            if verified_token != token:
+                return self.render_page(
+                    request,
+                    phase="otp",
+                    message=(
+                        "Please verify your email first. "
+                        "Your verification session may have expired."
+                    ),
+                    status_code=403,
+                )
+
+            new_password = request.POST.get("new_password", "")
+            confirm_password = request.POST.get(
+                "confirm_password", ""
+            )
+
+            if not new_password or not confirm_password:
+                return self.render_page(
+                    request,
+                    phase="password",
+                    message="Please fill in both password fields.",
+                    status_code=400,
+                )
+
+            if new_password != confirm_password:
+                return self.render_page(
+                    request,
+                    phase="password",
+                    message="The passwords do not match.",
+                    status_code=400,
+                )
+
             try:
                 validate_password(new_password, user)
             except ValidationError as error:
-                message = " ".join(error.messages)
-            else:
-                with transaction.atomic():
-                    user.set_password(new_password)
-
-                    user.save(
-                        update_fields=["password"]
-                    )
-
-                    EmailVerificationOTP.objects.filter(
-                        user=user,
-                        purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
-                        consumed_at__isnull=True,
-                    ).update(consumed_at=timezone.now())
-
-                    Token.objects.filter(user=user).delete()
-
-                    create_account_change_notification(
-                        user,
-                        "password_reset",
-                    )
-
-                return render(
+                return self.render_page(
                     request,
-                    "users/password_reset.html",
-                    {"success": True},
+                    phase="password",
+                    message=" ".join(error.messages),
+                    status_code=400,
                 )
 
-        return render(
-            request,
-            "users/password_reset.html",
-            {
-                "success": False,
-                "invalid_link": False,
-                "message": message,
-            },
-            status=400,
-        )
+            with transaction.atomic():
+                user.set_password(new_password)
+                user.save(update_fields=["password"])
 
+                # Invalidate any remaining password-reset OTPs.
+                EmailVerificationOTP.objects.filter(
+                    user=user,
+                    purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                    consumed_at__isnull=True,
+                ).update(consumed_at=timezone.now())
+
+                # Invalidate existing API authentication tokens.
+                Token.objects.filter(user=user).delete()
+
+                create_account_change_notification(
+                    user,
+                    "password_reset",
+                )
+
+            # Prevent this browser session from reusing the reset flow.
+            request.session.pop(session_key, None)
+
+            return self.render_page(
+                request,
+                success=True,
+            )
+
+        return self.render_page(
+            request,
+            phase="otp",
+            message="Invalid password reset request. Please try again.",
+            status_code=400,
+        )
 
 class MeView(RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
