@@ -33,7 +33,10 @@ from notifications.models import Notification
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from .models import User, EmailVerificationOTP
-from .serializers import VerifyEmailOTPSerializer
+from .serializers import (
+    VerifyEmailOTPSerializer,
+    VerifyPasswordResetOTPSerializer,
+)
 from .otp_services import (
     issue_otp,
     verify_user_otp,
