@@ -154,6 +154,8 @@ class AdminListReportView(ListAPIView):
     def get_queryset(self):
         return Report.objects.filter(
             barangay=self.request.user.assigned_barangay
+        ).select_related(
+            "user"
         ).order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
@@ -201,6 +203,9 @@ class AdminPotentialDuplicateListView(ListAPIView):
     def get_queryset(self):
         return PotentialDuplicate.objects.filter(
             report__barangay=self.request.user.assigned_barangay,
+        ).select_related(
+            "report__user",
+            "potential_duplicate__user",
         ).order_by("-created_at")
 
 

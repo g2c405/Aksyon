@@ -5,6 +5,12 @@ from .services.storage import create_signed_read_url
 from .utils import get_media_type
 from core.choices import Status, DismissalReason
 
+
+class ReportListUserSerializer(serializers.Serializer):
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+
+
 class ReportSerializer(serializers.ModelSerializer):
     description = serializers.CharField(max_length=200)
 
@@ -153,8 +159,7 @@ class ReportListSerializer(serializers.ModelSerializer):
 
 
 class AdminReportListSerializer(serializers.ModelSerializer):
-    video_thumbnail_url = serializers.SerializerMethodField()
-    image_url = serializers.SerializerMethodField()
+    user = ReportListUserSerializer(read_only=True)
 
     class Meta:
         model = Report
@@ -167,8 +172,6 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "city",
             "description",
             "category",
-            "image_url",
-            "video_thumbnail_url",
             "status",
             "created_at",
             "ongoing_at",
@@ -176,7 +179,9 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "dismissed_at",
             "dismissal_reason",
         )
+
         read_only_fields = (
+            "id",
             "user",
             "status",
             "created_at",
@@ -185,23 +190,7 @@ class AdminReportListSerializer(serializers.ModelSerializer):
             "dismissed_at",
             "dismissal_reason",
             "city",
-            "id",
         )
-
-    def get_image_url(self, obj):
-        if get_media_type(obj.media) != "image":
-            return None
-
-        return create_signed_read_url(obj.media)
-
-    def get_video_thumbnail_url(self, obj):
-        if get_media_type(obj.media) != "video":
-            return None
-
-        if not obj.media_thumbnail:
-            return None
-
-        return create_signed_read_url(obj.media_thumbnail)
 
 
 class AdminReportDetailSerializer(serializers.ModelSerializer):
