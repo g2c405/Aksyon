@@ -6,7 +6,8 @@ from django.conf import settings
 from .models import EmailVerificationOTP
 
 
-def send_otp_email(user, code, purpose, recipient):
+
+def send_otp_email(user, code, purpose, recipient, reset_url=None):
     """
     Send an OTP email based on the verification purpose.
     """
@@ -49,12 +50,32 @@ def send_otp_email(user, code, purpose, recipient):
                 "This code expires in 10 minutes."
             ),
         },
+
+        EmailVerificationOTP.Purpose.PASSWORD_RESET: {
+            "subject": "Reset your Aksyon password",
+            "message": (
+                "We received a request to reset your Aksyon password.\n\n"
+                f"Your password reset verification code is: {code}\n\n"
+                "This code expires in 10 minutes.\n\n"
+                "Alternatively, you can reset your password using "
+                "the link below:\n\n"
+                f"{reset_url}\n\n"
+                "If you did not request this, you can safely ignore "
+                "this email."
+            ),
+        },
     }
 
     content = email_content.get(purpose)
 
     if not content:
         raise ValueError("Invalid OTP email purpose.")
+
+    if (
+        purpose == EmailVerificationOTP.Purpose.PASSWORD_RESET
+        and not reset_url
+    ):
+        raise ValueError("Password reset URL is required.")
 
     resend.api_key = settings.RESEND_API_KEY
 
@@ -64,3 +85,4 @@ def send_otp_email(user, code, purpose, recipient):
         "subject": content["subject"],
         "text": content["message"],
     })
+

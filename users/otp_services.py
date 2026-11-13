@@ -183,7 +183,11 @@ def verify_user_otp(user, purpose, submitted_code):
 
 
 @transaction.atomic
-def issue_otp(user, purpose, recipient, target_value=""):
+def issue_otp( user,
+    purpose,
+    recipient,
+    target_value="",
+    reset_url=None,):
     """
     Create an OTP and send it through email.
 
@@ -198,10 +202,11 @@ def issue_otp(user, purpose, recipient, target_value=""):
     )
 
     send_otp_email(
-        user=user,
-        code=plain_otp,
-        purpose=purpose,
-        recipient=recipient,
+        user,
+        plain_otp,
+        purpose,
+        recipient,
+        reset_url=reset_url,
     )
 
     return otp_record

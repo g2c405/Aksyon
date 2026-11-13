@@ -47,6 +47,11 @@ from django.utils import timezone
 from audit_logs.services import record_activity
 from django.db import IntegrityError
 from .serializers import ChangeBarangaySerializer
+
+from django.core import signing
+from .otp_services import OTP_EXPIRY_MINUTES
+
+
 def create_account_change_notification(user, event):
     notification_content = {
         "email_changed": {
@@ -342,16 +347,20 @@ class ForgotPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
+        generic_response = {
+            "message": (
+                "If an account with that email exists, "
+                "password reset instructions have been sent."
+            )
+        }
+
+        user = User.objects.filter(
+            email__iexact=email.strip()
+        ).first()
+
+        if not user:
             return Response(
-                {
-                    "message": (
-                        "If an account with that email exists, "
-                        "a password reset link has been sent."
-                    )
-                },
+                generic_response,
                 status=status.HTTP_200_OK,
             )
 
@@ -362,31 +371,78 @@ class ForgotPasswordView(APIView):
             f"reset-password-page/{user.id}/{token}/"
         )
 
-        resend.api_key = settings.RESEND_API_KEY
+        try:
+            issue_otp(
+                user,
+                purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                recipient=user.email,
+                reset_url=reset_url,
+            )
 
-        resend.Emails.send({
-            "from": settings.DEFAULT_FROM_EMAIL,
-            "to": [user.email],
-            "subject": "Reset your Aksyon password",
-            "text": (
-                "We received a request to reset your password.\n\n"
-                "Open the link below to reset it:\n\n"
-                f"{reset_url}\n\n"
-                "If you did not request this, you can safely ignore "
-                "this email."
-            ),
-        })
+        except OTPResendCooldown:
+            # Do not reveal whether the email belongs to an account.
+            pass
 
         return Response(
-            {
-                "message": (
-                    "If an account with that email exists, "
-                    "a password reset link has been sent."
-                )
-            },
+            generic_response,
             status=status.HTTP_200_OK,
         )
 
+class VerifyPasswordResetOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = VerifyPasswordResetOTPSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        user = User.objects.filter(
+            email__iexact=email.strip()
+        ).first()
+
+        if not user:
+            return Response(
+                {"detail": "Invalid or expired verification code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            verify_user_otp(
+                user,
+                purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                submitted_code=code,
+            )
+
+        except (
+            OTPNotFound,
+            OTPExpired,
+            OTPInvalid,
+            OTPMaxAttempts,
+        ):
+            return Response(
+                {"detail": "Invalid or expired verification code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reset_token = signing.dumps(
+            {
+                "user_id": user.pk,
+                "password_hash": user.password,
+            },
+            salt="password-reset-otp",
+        )
+
+        return Response(
+            {
+                "message": "Verification successful.",
+                "reset_token": reset_token,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class ChangePasswordView(APIView):
     permission_classes = [IsUser | IsAdmin]
@@ -783,52 +839,98 @@ class ResetPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        user_id = request.data.get("user_id")
-        token = request.data.get("token")
+        reset_token = request.data.get("reset_token")
+        user = None
+
+        # OTP-based recovery
+        if reset_token:
+            try:
+                payload = signing.loads(
+                    reset_token,
+                    salt="password-reset-otp",
+                    max_age=OTP_EXPIRY_MINUTES * 60,
+                )
+
+                user = User.objects.get(
+                    pk=payload["user_id"]
+                )
+
+                # Ensure the credential belongs to the user's
+                # current password state.
+                if user.password != payload["password_hash"]:
+                    raise signing.BadSignature(
+                        "Password state has changed."
+                    )
+
+            except (
+                signing.BadSignature,
+                User.DoesNotExist,
+                KeyError,
+            ):
+                return Response(
+                    {"detail": "Invalid or expired password reset request."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Existing link/API recovery
+        else:
+            user_id = request.data.get("user_id")
+            token = request.data.get("token")
+
+            if not user_id or not token:
+                return Response(
+                    {"detail": "Required fields are missing."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                user = User.objects.get(pk=user_id)
+            except User.DoesNotExist:
+                return Response(
+                    {"detail": "Invalid password reset request."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not default_token_generator.check_token(user, token):
+                return Response(
+                    {
+                        "detail": (
+                            "This password reset link is invalid "
+                            "or has expired."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         new_password = request.data.get("new_password")
 
-        if not user_id or not token or not new_password:
+        if not new_password:
             return Response(
-                {"detail": "Required fields are missing."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            user = User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "Invalid password reset request."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not default_token_generator.check_token(
-            user,
-            token,
-        ):
-            return Response(
-                {
-                    "detail": (
-                        "This password reset link is invalid "
-                        "or has expired."
-                    )
-                },
+                {"detail": "New password is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             validate_password(new_password, user)
-        except ValidationError as e:
+        except ValidationError as error:
             return Response(
-                {"detail": e.messages},
+                {"detail": error.messages},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         with transaction.atomic():
             user.set_password(new_password)
+            user.save(update_fields=["password"])
 
-            user.save(
-                update_fields=["password"]
-            )
+            # Invalidate any remaining password-reset OTPs.
+            EmailVerificationOTP.objects.filter(
+                user=user,
+                purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                consumed_at__isnull=True,
+            ).update(consumed_at=timezone.now())
+
+            # Invalidate the existing DRF authentication token.
+            Token.objects.filter(user=user).delete()
 
             create_account_change_notification(
                 user,
@@ -934,6 +1036,14 @@ class PasswordResetPageView(APIView):
                     user.save(
                         update_fields=["password"]
                     )
+
+                    EmailVerificationOTP.objects.filter(
+                        user=user,
+                        purpose=EmailVerificationOTP.Purpose.PASSWORD_RESET,
+                        consumed_at__isnull=True,
+                    ).update(consumed_at=timezone.now())
+
+                    Token.objects.filter(user=user).delete()
 
                     create_account_change_notification(
                         user,

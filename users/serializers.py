@@ -585,3 +585,25 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
             "invalid": "Enter a valid 6-digit verification code."
         }
     )
+
+class VerifyPasswordResetOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+    code = serializers.RegexField(
+        regex=r"^\d{6}$",
+        error_messages={
+            "invalid": "Enter a valid 6-digit verification code."
+        },
+    )
+
+
+class PasswordResetOTPSerializer(serializers.Serializer):
+    reset_token = serializers.CharField(
+        required=True,
+        write_only=True,
+    )
+
+    new_password = serializers.CharField(
+        required=True,
+        write_only=True,
+    )

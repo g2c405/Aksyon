@@ -103,6 +103,7 @@ class EmailVerificationOTP(models.Model):
         REGISTRATION = "registration", "Registration"
         EMAIL_CHANGE = "email_change", "Email Change"
         CONTACT_CHANGE = "contact_change", "Contact Number Change"
+        PASSWORD_RESET = "password_reset", "Password Reset"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
