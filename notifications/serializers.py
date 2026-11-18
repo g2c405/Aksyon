@@ -11,6 +11,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "title",
             "message",
             "is_read",
+            "is_hidden",
             "created_at",
         )
         read_only_fields = (
@@ -20,6 +21,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "report",
             "title",
             "message",
+            "is_read",
+            "is_hidden",
             "created_at",
         )
 

@@ -432,7 +432,7 @@ class AdminCreateSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'first_name','last_name','username','email', 'contact_number', 'residential_barangay')
+        fields = ('id', 'first_name','last_name','username','email', 'contact_number', 'residential_barangay', 'role')
 
 class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:

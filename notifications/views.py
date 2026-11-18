@@ -15,8 +15,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Notification.objects
-            .filter(user=self.request.user)
-            .select_related("report")
+            .filter(
+                user=self.request.user,
+                is_hidden=False,
+            )
+            .select_related("report", "announcement")
             .order_by("-created_at")
         )
 
@@ -33,6 +36,45 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(
             self.get_serializer(notification).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["patch"],
+        url_path="mark-all-read",
+    )
+    def mark_all_read(self, request):
+        updated_count = Notification.objects.filter(
+            user=request.user,
+            is_hidden=False,
+            is_read=False,
+        ).update(is_read=True)
+
+        return Response(
+            {
+                "detail": "All notifications marked as read.",
+                "updated_count": updated_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="hide",
+    )
+    def hide(self, request, pk=None):
+        notification = self.get_object()
+
+        notification.is_hidden = True
+        notification.save(update_fields=["is_hidden"])
+
+        return Response(
+            {
+                "detail": "Notification hidden successfully.",
+                "id": notification.id,
+            },
             status=status.HTTP_200_OK,
         )
 
