@@ -78,6 +78,25 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(
+        detail=False,
+        methods=["patch"],
+        url_path="hide-all",
+    )
+    def hide_all(self, request):
+        updated_count = Notification.objects.filter(
+            user=request.user,
+            is_hidden=False,
+        ).update(is_hidden=True)
+
+        return Response(
+            {
+                "detail": "All notifications hidden successfully.",
+                "updated_count": updated_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class DevicePushTokenRegisterView(APIView):
     permission_classes = [IsUser]
 
