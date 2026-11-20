@@ -15,7 +15,7 @@ class AdminEmergencyUnitViewSet(ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            permission_classes = [IsAdmin]
+            permission_classes = [IsAdmin | IsPrivilegedAdmin]
         else:
             permission_classes = [IsPrivilegedAdmin]
 
