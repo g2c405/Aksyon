@@ -720,6 +720,11 @@ class VerifyContactNumberChangeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        return Response(
+            {"detail": "Contact number successfully updated."},
+            status=status.HTTP_200_OK,
+        )
+
 class ResendContactNumberChangeOTPView(APIView):
     permission_classes = [IsUser | IsPrivilegedAdmin]
 
