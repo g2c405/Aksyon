@@ -7,11 +7,12 @@ from audit_logs.services import record_activity
 
 from .models import EmergencyUnit
 from .serializers import EmergencyUnitSerializer
-
+from core.pagination import StandardResultsSetPagination
 
 class AdminEmergencyUnitViewSet(ModelViewSet):
     queryset = EmergencyUnit.objects.all().order_by("name")
     serializer_class = EmergencyUnitSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:

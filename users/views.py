@@ -29,7 +29,7 @@ from notifications.services import create_notification
 # Added for account-change notifications
 from django.db import transaction
 from notifications.models import Notification
-
+from core.pagination import StandardResultsSetPagination
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from .models import User, EmailVerificationOTP
@@ -1179,6 +1179,7 @@ class MeView(RetrieveAPIView):
 class AdminUserListView(ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = AdminUserSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         return User.objects.filter(
@@ -1309,6 +1310,7 @@ class AdminListView(ListAPIView):
 
     permission_classes = [IsPrivilegedAdmin]
     serializer_class = AdminSerializer
+    pagination_class = StandardResultsSetPagination
 
 
 class AdminRetrieveUpdateView(RetrieveUpdateAPIView):

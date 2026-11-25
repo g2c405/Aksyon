@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
+from core.pagination import StandardResultsSetPagination
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
@@ -87,7 +87,7 @@ def validate_report_status_transition(current_status, new_status):
 
 class ReportViewSet(ModelViewSet):
     permission_classes = [IsUser]
-
+    pagination_class = StandardResultsSetPagination
     def get_queryset(self):
         reports = Report.objects.filter(user=self.request.user)
 
@@ -149,6 +149,7 @@ class ReportViewSet(ModelViewSet):
 
 class AdminListReportView(ListAPIView):
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsSetPagination
     serializer_class = AdminReportListSerializer
 
     def get_queryset(self):
@@ -199,6 +200,7 @@ class AdminListReportView(ListAPIView):
 class AdminPotentialDuplicateListView(ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = AdminPotentialDuplicateListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         return PotentialDuplicate.objects.filter(

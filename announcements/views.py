@@ -22,15 +22,16 @@ from notifications.models import Notification
 from notifications.templates import ANNOUNCEMENT_NOTIFICATION_TEMPLATE
 from django.db import transaction
 from audit_logs.services import record_activity
+from core.pagination import StandardResultsSetPagination
 class AnnouncementListView(ListAPIView):
     permission_classes = [IsUser]
     serializer_class = AnnouncementListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         return Announcement.objects.filter(
             barangay=self.request.user.residential_barangay
         ).order_by("-created_at")
-
 
 class AnnouncementDetailView(RetrieveAPIView):
     permission_classes = [IsUser]
@@ -78,6 +79,7 @@ class AnnouncementVideoURLView(APIView):
 
 class AnnouncementViewSet(ModelViewSet):
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         return Announcement.objects.filter(
